@@ -1,114 +1,95 @@
 import telebot
 import requests
-import re
-import logging
-from threading import Thread
+import random
+import string
+import threading
+import time
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-# تكوين الإعدادات
-TOKEN = "7087784225:AAF-TUMXou11lHOr5VLRq37PgCEbOBqKH3U"  # استبدله بتوكن بوتك
-CHANNEL_ID = "@mmmmmuyter"  # استبدل بإسم قناتك
-ADMIN_IDS = [5367866254]  # أضف أي دي حسابك
-
-# إعداد التسجيل
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
-logger = logging.getLogger(__name__)
-
+# إعدادات البوت
+TOKEN = "7087784225:AAF-TUMXou11lHOr5VLRq37PgCEbOBqKH3U"  # ❌ استبدل بتوكن البوت الخاص بك
+CHANNEL_ID = "@mmmmmuyter"
+ADMIN_ID = 5367866254
 bot = telebot.TeleBot(TOKEN)
 
-def is_rare_username(username):
-    """تصفية اليوزرات النادرة (ثنائية/ثلاثية/رباعية)"""
-    return 2 <= len(username) <= 4 and username.isalnum()
+# حالة التشغيل
+hunt_active = False
+stop_event = threading.Event()
 
-def check_username_availability(username):
-    """فحص توفر اليوزر عبر طلبات HTTP"""
+# إعدادات الاصطياد
+TARGET_LENGTHS = [2, 3, 4]  # أطوال اليوزرات المطلوبة
+HUNT_DELAY = 3  # تأخير بين المحاولات (ثواني)
+
+def generate_rare_username(length):
+    """إنشاء يوزر نادر عشوائي"""
+    chars = string.ascii_lowercase + string.digits
+    while True:
+        username = ''.join(random.choice(chars) for _ in range(length))
+        if not username.isdigit() and len(set(username)) >= length//2:
+            return username
+
+def hunt(username):
+    """وظيفة الاصطياد الرئيسية"""
     try:
-        url = f"https://t.me/{username}"
-        headers = {'User-Agent': 'Mozilla/5.0'}
-        response = requests.get(url, headers=headers, timeout=10)
+        # فحص تليجرام
+        tg_status = "🟢" if requests.get(f"https://t.me/{username}", timeout=5).text.count("You can contact") else "🔴"
         
-        if "If you have <strong>Telegram</strong>, you can contact" in response.text:
-            return True  # متاح
-        return False  # محجوز
-    except Exception as e:
-        logger.error(f"Error checking @{username}: {str(e)}")
-        return None
+        # فحص إنستغرام
+        ig_status = "🟢" if requests.get(f"https://www.instagram.com/{username}/", timeout=5).status_code == 404 else "🔴"
+        
+        if "🟢" in [tg_status, ig_status]:
+            report = f"""🎯 يوزر نادر متاح!
+@{username}
+تليجرام: {tg_status} | إنستغرام: {ig_status}
+تليجرام: t.me/{username}
+إنستغرام: instagram.com/{username}"""
+            
+            bot.send_message(CHANNEL_ID, report)
+            if tg_status == "🟢":
+                bot.send_message(ADMIN_ID, f"🚨 تليجرام متاح!\n{report}")
+            if ig_status == "🟢":
+                bot.send_message(ADMIN_ID, f"🚨 إنستغرام متاح!\n{report}")
+    except:
+        pass
+
+def auto_hunt():
+    """عملية الاصطياد التلقائي"""
+    while hunt_active and not stop_event.is_set():
+        username = generate_rare_username(random.choice(TARGET_LENGTHS))
+        threading.Thread(target=hunt, args=(username,)).start()
+        time.sleep(HUNT_DELAY)
 
 @bot.message_handler(commands=['start'])
 def start(message):
-    if message.from_user.id not in ADMIN_IDS:
-        bot.reply_to(message, "❌ هذا البوت للاستخدام الشخصي فقط")
-        return
-    
-    markup = telebot.types.ReplyKeyboardMarkup(row_width=2)
-    btn1 = telebot.types.KeyboardButton('فحص اليوزرات')
-    btn2 = telebot.types.KeyboardButton('المساعدة')
-    markup.add(btn1, btn2)
-    
-    bot.send_message(
-        message.chat.id,
-        "مرحبًا! أنا بوت فحص اليوزرات النادرة (ثنائية/ثلاثية/رباعية).\n\n"
-        "اختر أحد الخيارات:",
-        reply_markup=markup
-    )
+    if message.from_user.id == ADMIN_ID:
+        markup = InlineKeyboardMarkup()
+        markup.row(
+            InlineKeyboardButton("▶️ تشغيل الاصطياد", callback_data="start_hunt"),
+            InlineKeyboardButton("⏹️ إيقاف الاصطياد", callback_data="stop_hunt")
+        )
+        bot.send_message(message.chat.id, "🛠️ لوحة تحكم بوت الاصطياد:", reply_markup=markup)
 
-@bot.message_handler(func=lambda m: m.text == 'فحص اليوزرات')
-def ask_for_usernames(message):
-    bot.reply_to(message, "أرسل قائمة اليوزرات التي تريد فحصها (مفصولة بمسافات أو أسطر):")
-
-@bot.message_handler(func=lambda m: m.text and not m.text.startswith('/'))
-def process_usernames(message):
-    if message.from_user.id not in ADMIN_IDS:
+@bot.callback_query_handler(func=lambda call: True)
+def callback_handler(call):
+    global hunt_active, stop_event
+    
+    if call.from_user.id != ADMIN_ID:
+        bot.answer_callback_query(call.id, "❌ غير مصرح لك!")
         return
     
-    text = message.text
-    usernames = re.findall(r'@?([a-zA-Z0-9_]{2,4})\b', text)
-    usernames = list(set(filter(is_rare_username, usernames)))
+    if call.data == "start_hunt" and not hunt_active:
+        hunt_active = True
+        stop_event.clear()
+        threading.Thread(target=auto_hunt).start()
+        bot.edit_message_text("✅ تم تشغيل وضع الاصطياد التلقائي", call.message.chat.id, call.message.message_id)
+        
+    elif call.data == "stop_hunt" and hunt_active:
+        hunt_active = False
+        stop_event.set()
+        bot.edit_message_text("❌ تم إيقاف الاصطياد", call.message.chat.id, call.message.message_id)
     
-    if not usernames:
-        bot.reply_to(message, "⚠️ لم يتم العثور على يوزرات نادرة (2-4 أحرف/أرقام)")
-        return
-    
-    bot.reply_to(message, f"🔍 جارٍ فحص {len(usernames)} يوزر...")
-    
-    available = []
-    unavailable = []
-    
-    def check_and_save(username):
-        if check_username_availability(username):
-            available.append(f"@{username}")
-        else:
-            unavailable.append(f"@{username}")
-    
-    # فحص متوازي باستخدام Threading
-    threads = []
-    for username in usernames:
-        t = Thread(target=check_and_save, args=(username,))
-        t.start()
-        threads.append(t)
-    
-    for t in threads:
-        t.join()
-    
-    # إرسال النتائج
-    report = "📊 نتائج الفحص:\n\n"
-    if available:
-        report += f"✅ متاح ({len(available)}):\n" + "\n".join(available) + "\n\n"
-    if unavailable:
-        report += f"❌ محجوز ({len(unavailable)}):\n" + "\n".join(unavailable)
-    
-    bot.reply_to(message, report)
-    
-    # إرسال إلى القناة (إذا وجدت يوزرات متاحة)
-    if available:
-        channel_report = f"📢 يوزرات متاحة:\n" + " ".join(available)
-        try:
-            bot.send_message(CHANNEL_ID, channel_report)
-        except Exception as e:
-            logger.error(f"فشل إرسال إلى القناة: {e}")
+    bot.answer_callback_query(call.id)
 
 if __name__ == '__main__':
-    logger.info("Bot is running...")
-    bot.polling(none_stop=True)
+    print("🔥 البوت يعمل! أرسل /start للتحكم")
+    bot.polling()
