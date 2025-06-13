@@ -1,3 +1,14 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+ULTIMATE USERNAME HUNTER BOT v6.0
+- Advanced pattern generation
+- Multi-layer verification
+- AI-powered availability prediction
+- Proxy support
+- Continuous hunting with smart breaks
+"""
+
 import telebot
 import requests
 import random
@@ -6,15 +17,354 @@ import logging
 import re
 import time
 import threading
+import json
 from datetime import datetime
 
-# Configuration
-TOKEN = "7087784225:AAF-TUMXou11lHOr5VLRq37PgCEbOBqKH3U"
-CHANNEL_ID = "@mmmmmuyter"
-ADMIN_ID = 5367866254
-bot = telebot.TeleBot(TOKEN)
+# =============== CONFIGURATION ===============
+class Config:
+    def __init__(self):
+        # Core Settings
+        self.TOKEN = "7087784225:AAF-TUMXou11lHOr5VLRq37PgCEbOBqKH3U"
+        self.CHANNEL_ID = "@mmmmmuyter"
+        self.ADMIN_ID = 5367866254
+        self.MAX_THREADS = 10
+        self.REQUEST_TIMEOUT = 7
+        self.HUNT_BATCH_SIZE = 50
+        self.BREAK_DURATION = 300  # 5 minutes
+        
+        # Premium Patterns
+        self.PATTERNS = {
+            'rare2': r'^[a-z]{2}$',          # Double letters (aa)
+            'gold2': r'^[a-z]\d$',           # Letter + number (a1)
+            'vip3': r'^[a-z]{3}$',           # Triple letters (aaa)
+            'platinum3': r'^[a-z]{2}\d$',    # Two letters + number (aa1)
+            'elite4': r'^[a-z]{2}\d{2}$',    # Two letters + two numbers (aa11)
+            'premium5': r'^[a-z]{2}\d[a-z]{2}$' # Premium pattern (aa1bb)
+        }
+        
+        # Proxy Settings
+        self.PROXY_ENABLED = False
+        self.PROXY_LIST = [
+            'http://proxy1.example.com:8080',
+            'http://proxy2.example.com:8080'
+        ]
+        
+        # AI Model Parameters
+        self.MIN_PREDICTION_CONFIDENCE = 0.7
 
-# Logging
+# =============== CORE COMPONENTS ===============
+class UltimateGenerator:
+    """Advanced username generator with smart patterns"""
+    
+    def __init__(self, config):
+        self.config = config
+        self.char_sets = {
+            'vowels': 'aeiou',
+            'consonants': 'bcdfghjklmnpqrstvwxyz',
+            'digits': '123456789',
+            'premium': 'aeiouxz'
+        }
+        self.common_usernames = self._load_common_usernames()
+    
+    def _load_common_usernames(self):
+        """Load frequently taken usernames"""
+        return ['admin', 'user', 'owner', 'official', 'test', 'web', 
+                'mail', 'root', 'support', 'info', 'account', 'service']
+    
+    def generate(self, pattern_type):
+        """Generate username with advanced pattern matching"""
+        for _ in range(100):  # Generation attempts
+            username = None
+            
+            if pattern_type == 'rare2':
+                # Alternate between vowel+consonant and consonant+vowel
+                if random.choice([True, False]):
+                    username = (random.choice(self.char_sets['vowels']) + 
+                               random.choice(self.char_sets['consonants']))
+                else:
+                    username = (random.choice(self.char_sets['consonants']) + 
+                               random.choice(self.char_sets['vowels']))
+            
+            elif pattern_type == 'gold2':
+                username = (random.choice(self.char_sets['premium']) + 
+                           random.choice(self.char_sets['digits'][::2]))  # Odd digits only
+            
+            elif pattern_type == 'vip3':
+                username = ''.join(random.choice(self.char_sets['premium']) 
+                                 for _ in range(3))
+            
+            elif pattern_type == 'platinum3':
+                username = (random.choice(self.char_sets['premium']) * 2 + 
+                           random.choice(self.char_sets['digits']))
+            
+            elif pattern_type == 'elite4':
+                username = (random.choice(self.char_sets['premium']) * 2 + 
+                           random.choice(self.char_sets['digits'][::2]) * 2)
+            
+            elif pattern_type == 'premium5':
+                username = (random.choice(self.char_sets['premium']) * 2 + 
+                           random.choice(self.char_sets['digits']) + 
+                           random.choice(self.char_sets['premium']) * 2)
+            
+            # Validate and return
+            if (username and 
+                re.match(self.config.PATTERNS[pattern_type], username) and 
+                username not in self.common_usernames):
+                return username
+        return None
+
+class AdvancedChecker:
+    """Multi-layer username availability checker"""
+    
+    def __init__(self, config):
+        self.config = config
+        self.session = requests.Session()
+        self.session.headers.update({
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        })
+    
+    def check(self, username):
+        """Three-layer verification system"""
+        try:
+            # Layer 1: Quick HEAD request
+            if not self._quick_check(username):
+                return {'status': 'taken', 'source': 'telegram'}
+            
+            # Layer 2: Instagram verification
+            ig_status = self._check_instagram(username)
+            if ig_status != 'available':
+                return {'status': 'taken', 'source': 'instagram'}
+            
+            # Layer 3: Detailed Telegram check
+            tg_status = self._detailed_telegram_check(username)
+            if tg_status != 'available':
+                return {'status': 'taken', 'source': 'telegram'}
+            
+            return {'status': 'available', 'source': 'both'}
+        
+        except Exception as e:
+            logging.error(f"Check failed for @{username}: {str(e)}")
+            return {'status': 'error', 'details': str(e)}
+    
+    def _quick_check(self, username):
+        """Lightweight initial check"""
+        try:
+            response = self.session.head(
+                f"https://t.me/{username}",
+                timeout=self.config.REQUEST_TIMEOUT,
+                proxies=self._get_proxy()
+            )
+            return response.status_code == 404
+        except:
+            return True  # Proceed to next check if failed
+    
+    def _check_instagram(self, username):
+        """Instagram availability check"""
+        try:
+            response = self.session.get(
+                f"https://www.instagram.com/{username}",
+                timeout=self.config.REQUEST_TIMEOUT,
+                proxies=self._get_proxy(),
+                allow_redirects=False
+            )
+            return 'available' if response.status_code == 404 else 'taken'
+        except:
+            return 'error'
+    
+    def _detailed_telegram_check(self, username):
+        """Comprehensive Telegram check"""
+        try:
+            response = self.session.get(
+                f"https://t.me/{username}",
+                timeout=self.config.REQUEST_TIMEOUT,
+                proxies=self._get_proxy()
+            )
+            return 'available' if "You can contact" in response.text else 'taken'
+        except:
+            return 'error'
+    
+    def _get_proxy(self):
+        """Get random proxy if enabled"""
+        if self.config.PROXY_ENABLED and self.config.PROXY_LIST:
+            return {'http': random.choice(self.config.PROXY_LIST)}
+        return None
+
+class AIPredictor:
+    """AI-powered availability predictor"""
+    
+    def __init__(self, config):
+        self.config = config
+        self.pattern_weights = {
+            'rare2': 0.95,
+            'gold2': 0.85,
+            'vip3': 0.75,
+            'platinum3': 0.70,
+            'elite4': 0.65,
+            'premium5': 0.60
+        }
+    
+    def predict(self, username):
+        """Predict availability probability (0-1)"""
+        # Calculate pattern score
+        pattern_score = next((self.pattern_weights[p] for p in self.config.PATTERNS 
+                            if re.match(self.config.PATTERNS[p], username)), 0.5)
+        
+        # Calculate complexity score
+        vowels = sum(1 for c in username if c in 'aeiou')
+        vowel_ratio = vowels / len(username)
+        complexity = 0.3 + (0.7 * vowel_ratio)  # More vowels = more likely available
+        
+        # Combined prediction
+        return (pattern_score * 0.6) + (complexity * 0.4)
+
+class HuntingEngine:
+    """Core hunting system"""
+    
+    def __init__(self, config):
+        self.config = config
+        self.generator = UltimateGenerator(config)
+        self.checker = AdvancedChecker(config)
+        self.predictor = AIPredictor(config)
+        self.is_active = False
+        self.session_count = 0
+        self.stats = {
+            'total_generated': 0,
+            'available_found': 0,
+            'last_available': None
+        }
+    
+    def start(self):
+        """Start continuous hunting"""
+        if not self.is_active:
+            self.is_active = True
+            threading.Thread(target=self._hunt_loop, daemon=True).start()
+            return True
+        return False
+    
+    def stop(self):
+        """Stop hunting"""
+        if self.is_active:
+            self.is_active = False
+            return True
+        return False
+    
+    def _hunt_loop(self):
+        """Main hunting loop"""
+        while self.is_active:
+            try:
+                self.session_count += 1
+                logger.info(f"🚀 Starting hunt session #{self.session_count}")
+                
+                # Hunt batch
+                batch_results = self._run_hunt_batch()
+                
+                # Process results
+                self._process_results(batch_results)
+                
+                # Take break if still active
+                if self.is_active:
+                    logger.info(f"⏳ Taking {self.config.BREAK_DURATION//60} min break")
+                    time.sleep(self.config.BREAK_DURATION)
+                
+            except Exception as e:
+                logger.error(f"Hunt loop error: {str(e)}")
+                time.sleep(30)
+    
+    def _run_hunt_batch(self):
+        """Run a single hunt batch"""
+        results = []
+        for _ in range(self.config.HUNT_BATCH_SIZE):
+            if not self.is_active:
+                break
+                
+            # Generate username
+            pattern = random.choice(list(self.config.PATTERNS.keys()))
+            username = self.generator.generate(pattern)
+            self.stats['total_generated'] += 1
+            
+            if not username:
+                continue
+                
+            # AI prediction filter
+            if self.predictor.predict(username) < self.config.MIN_PREDICTION_CONFIDENCE:
+                continue
+                
+            # Availability check
+            result = self.checker.check(username)
+            if result['status'] == 'available':
+                results.append({
+                    'username': username,
+                    'pattern': pattern,
+                    'source': result['source'],
+                    'time': datetime.now().strftime("%H:%M:%S")
+                })
+            
+            time.sleep(1)  # Rate limiting
+        
+        return results
+    
+    def _process_results(self, results):
+        """Process and report hunt results"""
+        if not results:
+            logger.info("No available usernames found in this batch")
+            return
+            
+        self.stats['available_found'] += len(results)
+        self.stats['last_available'] = datetime.now()
+        
+        # Send individual alerts
+        for result in results:
+            self._send_alert(result)
+        
+        # Send summary
+        self._send_summary(len(results))
+    
+    def _send_alert(self, result):
+        """Send alert for available username"""
+        message = (
+            f"🎉 **Username Available!**\n\n"
+            f"✨ `@{result['username']}`\n"
+            f"🏷️ Pattern: `{result['pattern']}`\n"
+            f"🕒 Time: `{result['time']}`\n"
+            f"🔍 Verified on: `{result['source']}`\n\n"
+            f"[Telegram](https://t.me/{result['username']}) | "
+            f"[Instagram](https://instagram.com/{result['username']})"
+        )
+        
+        try:
+            bot.send_message(
+                self.config.CHANNEL_ID,
+                message,
+                parse_mode="Markdown",
+                disable_web_page_preview=True
+            )
+        except Exception as e:
+            logger.error(f"Failed to send alert: {str(e)}")
+    
+    def _send_summary(self, available_count):
+        """Send batch summary"""
+        summary = (
+            f"📊 **Hunt Session #{self.session_count} Summary**\n\n"
+            f"🔢 Usernames checked: `{self.config.HUNT_BATCH_SIZE}`\n"
+            f"💎 Available found: `{available_count}`\n"
+            f"🛑 Next hunt in: `{self.config.BREAK_DURATION//60} minutes`"
+        )
+        
+        try:
+            bot.send_message(
+                self.config.CHANNEL_ID,
+                summary,
+                parse_mode="Markdown"
+            )
+        except Exception as e:
+            logger.error(f"Failed to send summary: {str(e)}")
+
+# =============== BOT SETUP ===============
+config = Config()
+bot = telebot.TeleBot(config.TOKEN)
+hunter = HuntingEngine(config)
+
+# Setup logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
@@ -23,185 +373,51 @@ logging.basicConfig(
         logging.StreamHandler()
     ]
 )
-logger = logging.getLogger('PremiumHunterPro')
+logger = logging.getLogger('UltimateHunter')
 
-# Premium Patterns
-PATTERNS = {
-    'rare2': r'^[a-z]{2}$',          # ثنائي نادر (aa)
-    'gold2': r'^[a-z]\d$',           # شبه ثنائي (a1)
-    'vip3': r'^[a-z]{3}$',           # ثلاثي فاخر (aaa)
-    'platinum3': r'^[a-z]{2}\d$',    # شبه ثلاثي (aa1)
-    'elite4': r'^[a-z]{2}\d{2}$',    # رباعي ذهبي (aa11)
-    'premium5': r'^[a-z]{2}\d[a-z]{2}$'  # خماسي مميز (aa1bb)
-}
+# =============== BOT COMMANDS ===============
+@bot.message_handler(commands=['start'])
+def start_bot(message):
+    if message.from_user.id == config.ADMIN_ID:
+        if hunter.start():
+            bot.reply_to(message, "🚀 Ultimate Hunter Activated!")
+        else:
+            bot.reply_to(message, "⚠️ Hunter is already running!")
+    else:
+        bot.reply_to(message, "⛔ Unauthorized!")
 
-class SmartGenerator:
-    @staticmethod
-    def generate(pattern):
-        """يولد يوزرات ذكية حسب النمط"""
-        try:
-            if pattern == 'rare2':
-                return random.choice('aeioux') + random.choice('bcdfghjklmnpqrstvwxyz')
-            elif pattern == 'gold2':
-                return random.choice('aeioux') + random.choice('123456789')
-            elif pattern == 'vip3':
-                return ''.join(random.choice('aeioux') for _ in range(3))
-            elif pattern == 'platinum3':
-                return random.choice('aeioux')*2 + random.choice('123456789')
-            elif pattern == 'elite4':
-                return random.choice('aeioux')*2 + random.choice('13579')*2
-            elif pattern == 'premium5':
-                return random.choice('aeioux')*2 + random.choice('123') + random.choice('aeioux')*2
-        except Exception as e:
-            logger.error(f"Generation error: {e}")
-            return None
+@bot.message_handler(commands=['stop'])
+def stop_bot(message):
+    if message.from_user.id == config.ADMIN_ID:
+        if hunter.stop():
+            bot.reply_to(message, "🛑 Hunter Stopped!")
+        else:
+            bot.reply_to(message, "⚠️ Hunter isn't running!")
+    else:
+        bot.reply_to(message, "⛔ Unauthorized!")
 
-class TurboScanner:
-    @staticmethod
-    def check(username):
-        """فحص اليوزر بذكاء"""
-        try:
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-            }
-            
-            # Telegram Check
-            tg = requests.get(
-                f"https://t.me/{username}",
-                headers=headers,
-                timeout=10
-            ).text
-            tg_status = 'available' if "You can contact" in tg else 'taken'
-            
-            # Instagram Check
-            ig = requests.get(
-                f"https://instagram.com/{username}",
-                headers=headers,
-                timeout=10,
-                allow_redirects=False
-            )
-            ig_status = 'available' if ig.status_code == 404 else 'taken'
-            
-            return {
-                'username': username,
-                'telegram': tg_status,
-                'instagram': ig_status,
-                'value': TurboScanner.calculate_value(username),
-                'time': datetime.now().strftime("%H:%M:%S")
-            }
-        except Exception as e:
-            logger.error(f"Scan error: {e}")
-            return None
-
-    @staticmethod
-    def calculate_value(username):
-        """حساب قيمة اليوزر"""
-        length = len(username)
-        pattern_score = {
-            'rare2': 100, 'gold2': 80, 'vip3': 70,
-            'platinum3': 60, 'elite4': 50, 'premium5': 40
-        }.get(next((p for p in PATTERNS if re.match(PATTERNS[p], username)), ''), 0)
+@bot.message_handler(commands=['stats'])
+def show_stats(message):
+    if message.from_user.id == config.ADMIN_ID:
+        stats = hunter.stats
+        last = stats['last_available'].strftime("%Y-%m-%d %H:%M") if stats['last_available'] else "Never"
         
-        vowels = sum(1 for c in username if c in 'aeiou')
-        return (pattern_score + vowels * 5) * (10 - length)
-
-class HuntingEngine:
-    def __init__(self):
-        self.is_active = False
-        self.session_count = 0
-
-    def start_hunting(self):
-        self.is_active = True
-        threading.Thread(target=self._hunt_loop, daemon=True).start()
-
-    def _hunt_loop(self):
-        while self.is_active:
-            try:
-                # مرحلة الصيد النشط (50 يوزر)
-                self.session_count += 1
-                logger.info(f"🚀 بدأت جلسة الصيد #{self.session_count}")
-                
-                all_results = []
-                for i in range(50):
-                    if not self.is_active:
-                        break
-                        
-                    # توليد يوزر عشوائي من أنماط مختلفة
-                    pattern = random.choice(list(PATTERNS.keys()))
-                    username = SmartGenerator.generate(pattern)
-                    
-                    if username:
-                        result = TurboScanner.check(username)
-                        if result:
-                            all_results.append(result)
-                            self._process_result(result)
-                    
-                    time.sleep(1)  # تأخير بين كل يوزر
-                
-                # إرسال التقرير النهائي
-                self._send_summary(all_results)
-                
-                # استراحة 5 دقائق
-                if self.is_active:
-                    logger.info("⏳ استراحة لمدة 5 دقائق...")
-                    time.sleep(300)
-                    
-            except Exception as e:
-                logger.error(f"Error in hunt loop: {e}")
-                time.sleep(30)
-
-    def _process_result(self, result):
-        """معالجة النتائج الفورية"""
-        if result['telegram'] == 'available' or result['instagram'] == 'available':
-            report = (
-                f"✨ **يوزر متاح!**\n"
-                f"🔹 `@{result['username']}`\n"
-                f"🏷️ النمط: {next(p for p in PATTERNS if re.match(PATTERNS[p], result['username']))}\n"
-                f"💰 القيمة: ${result['value']}\n"
-                f"⏰ الوقت: {result['time']}\n"
-                f"📱 تليجرام: {'🟢' if result['telegram'] == 'available' else '🔴'}\n"
-                f"📷 إنستجرام: {'🟢' if result['instagram'] == 'available' else '🔴'}"
-            )
-            bot.send_message(CHANNEL_ID, report, parse_mode="Markdown")
-
-    def _send_summary(self, results):
-        """إرسال ملخص الجلسة"""
-        available = [r for r in results if r['telegram'] == 'available' or r['instagram'] == 'available']
-        
-        summary = (
-            f"📊 **ملخص جلسة الصيد #{self.session_count}**\n"
-            f"🔢 عدد اليوزرات المفحوصة: {len(results)}\n"
-            f"💎 اليوزرات المتاحة: {len(available)}\n"
-            f"🏆 أفضل يوزر: @{max(results, key=lambda x: x['value'])['username']} (${max(r['value'] for r in results)})\n"
-            f"⏱️ المدة التالية: 5 دقائق استراحة"
+        report = (
+            f"📈 **Hunter Statistics**\n\n"
+            f"🔢 Total Generated: `{stats['total_generated']}`\n"
+            f"💎 Available Found: `{stats['available_found']}`\n"
+            f"🕒 Last Available: `{last}`\n"
+            f"🏷️ Current Session: `#{hunter.session_count}`"
         )
-        bot.send_message(CHANNEL_ID, summary, parse_mode="Markdown")
-
-# Bot Commands
-hunter = HuntingEngine()
-
-@bot.message_handler(commands=['start_hunt'])
-def start_hunting(message):
-    if message.from_user.id == ADMIN_ID:
-        if not hunter.is_active:
-            hunter.start_hunting()
-            bot.reply_to(message, "🎯 بدأ الصيد الذكي! (50 يوزر / 5 دقائق استراحة)")
-        else:
-            bot.reply_to(message, "⚠️ الصيد يعمل بالفعل!")
+        
+        bot.reply_to(message, report, parse_mode="Markdown")
     else:
-        bot.reply_to(message, "⛔ ليس لديك صلاحية!")
+        bot.reply_to(message, "⛔ Unauthorized!")
 
-@bot.message_handler(commands=['stop_hunt'])
-def stop_hunting(message):
-    if message.from_user.id == ADMIN_ID:
-        if hunter.is_active:
-            hunter.is_active = False
-            bot.reply_to(message, "🛑 تم إيقاف الصيد!")
-        else:
-            bot.reply_to(message, "⚠️ الصيد غير نشط بالفعل!")
-    else:
-        bot.reply_to(message, "⛔ ليس لديك صلاحية!")
-
+# =============== MAIN EXECUTION ===============
 if __name__ == '__main__':
-    logger.info("🔥 البوت جاهز! أرسل /start_hunt للبدء")
-    bot.infinity_polling()
+    logger.info("🔥 Ultimate Username Hunter Bot Starting...")
+    try:
+        bot.infinity_polling()
+    except Exception as e:
+        logger.error(f"Fatal error: {str(e)}")
