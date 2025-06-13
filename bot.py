@@ -8,9 +8,9 @@ import concurrent.futures
 from datetime import datetime
 
 # Configuration
-TOKEN = "YOUR_BOT_TOKEN"
-CHANNEL_ID = "@yourchannel"
-ADMIN_ID = YOUR_ADMIN_ID
+TOKEN = "7087784225:AAF-TUMXou11lHOr5VLRq37PgCEbOBqKH3U"
+CHANNEL_ID = "@mmmmmuyter"
+ADMIN_ID = 5367866254
 MAX_WORKERS = 20  # Increased threads for ultra-fast checking
 bot = telebot.TeleBot(TOKEN, threaded=True)
 
