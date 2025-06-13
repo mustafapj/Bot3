@@ -2,72 +2,115 @@ import telebot
 import requests
 import random
 import string
+import logging
+import re
 import time
 from threading import Thread
+from datetime import datetime
 
-TOKEN = "7087784225:AAF-TUMXou11lHOr5VLRq37PgCEbOBqKH3U"  # ❌ استبدله بتوكن البوت الخاص بك
-CHANNEL_ID = "@mmmmmuyter"  # ❌ استبدل بقناتك
-ADMIN_ID = 5367866254  # ❌ استبدل برقمك
-
+# إعدادات البوت
+TOKEN = "7087784225:AAF-TUMXou11lHOr5VLRq37PgCEbOBqKH3U"
+CHANNEL_ID = "@mmmmmuyter"
+ADMIN_ID = 5367866254
 bot = telebot.TeleBot(TOKEN)
 
-# إعدادات الفحص
-DELAY = 5  # تأخير بين الطلبات (تجنب الحظر)
-HEADERS = {'User-Agent': 'Mozilla/5.0'}
+# إعداد المسجل
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
-def generate_username(length):
-    """إنشاء يوزر عشوائي نادر"""
-    chars = string.ascii_lowercase + string.digits
-    return ''.join(random.choice(chars) for _ in range(length))
+# إعدادات الاصطياد
+DELAY = 3
+PATTERNS = {'5prem': r'^[a-z]{2}\d[a-z]{2}$'}
 
-def check_telegram(username):
-    """فحص تليجرام بدقة"""
+def generate_premium_5char():
+    while True:
+        username = (
+            random.choice(string.ascii_lowercase) +
+            random.choice(string.ascii_lowercase) +
+            random.choice(string.digits) +
+            random.choice(string.ascii_lowercase) +
+            random.choice(string.ascii_lowercase)
+        )
+        if re.match(PATTERNS['5prem'], username):
+            return username
+
+def check_platform(username, platform):
     try:
-        r = requests.get(f"https://t.me/{username}", headers=HEADERS, timeout=10)
-        return "available" if "You can contact" in r.text else "taken"
-    except Exception as e:
-        print(f"Error checking Telegram: {e}")
-        return "error"
-
-def check_instagram(username):
-    """فحص إنستغرام بدقة"""
-    try:
-        r = requests.get(f"https://www.instagram.com/{username}/", headers=HEADERS, timeout=10)
-        return "available" if r.status_code == 404 else "taken"
-    except Exception as e:
-        print(f"Error checking Instagram: {e}")
-        return "error"
-
-def hunt_and_report(username):
-    """فحص اليوزر وإرسال النتائج"""
-    tg_status = check_telegram(username)
-    ig_status = check_instagram(username)
-    
-    if "available" in [tg_status, ig_status]:
-        report = f"🎯 *يوزر متاح!*\n\n"
-        report += f"🔹 `{username}`\n"
-        report += f"• تليجرام: {'🟢 متاح' if tg_status == 'available' else '🔴 محجوز'}\n"
-        report += f"• إنستغرام: {'🟢 متاح' if ig_status == 'available' else '🔴 محجوز'}\n\n"
-        report += f"📎 تليجرام: t.me/{username}\n"
-        report += f"📎 إنستغرام: instagram.com/{username}"
+        url = f"https://{'t.me' if platform == 'telegram' else 'www.instagram.com'}/{username}"
+        response = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}, timeout=10)
         
-        try:
-            bot.send_message(CHANNEL_ID, report, parse_mode="Markdown")
-            bot.send_message(ADMIN_ID, "🚨 تم العثور على يوزر متاح! تفحص القناة.")
-        except Exception as e:
-            print(f"Error sending message: {e}")
+        if platform == "telegram":
+            return "available" if "You can contact" in response.text else "taken"
+        else:
+            return "available" if response.status_code == 404 else "taken"
+    except Exception as e:
+        logger.error(f"Error checking @{username} on {platform}: {e}")
+        return "error"
 
-@bot.message_handler(commands=['start_hunt'])
-def start_hunt(message):
-    if message.from_user.id == ADMIN_ID:
-        bot.reply_to(message, "🎣 بدأ الاصطياد... (سيتم إرسال النتائج للقناة)")
-        # تشغيل 5 عمليات فحص متوازية
-        for _ in range(5):
-            length = random.choice([2, 3])  # ثنائي أو ثلاثي
-            username = generate_username(length)
-            Thread(target=hunt_and_report, args=(username,)).start()
-            time.sleep(DELAY)
+@bot.message_handler(commands=['hunt_premium'])
+def hunt_premium(message):
+    if message.from_user.id != ADMIN_ID:
+        bot.reply_to(message, "⛔ ليس لديك صلاحية!")
+        return
+    
+    premium_usernames = [generate_premium_5char() for _ in range(5)]
+    bot.reply_to(message, "🎣 بدأ اصطياد اليوزرات الخماسية المميزة...")
+    
+    results = {"available": [], "taken": []}
+    for username in premium_usernames:
+        status = check_and_report(username)
+        if "available" in status.values():
+            results["available"].append(username)
+        else:
+            results["taken"].append(username)
+        time.sleep(DELAY)
+    
+    # إرسال التقرير النهائي
+    send_summary_report(results)
+
+def check_and_report(username):
+    status = {
+        "telegram": check_platform(username, "telegram"),
+        "instagram": check_platform(username, "instagram")
+    }
+    return status
+
+def send_summary_report(results):
+    report = "📊 **تقرير الاصطياد**\n\n"
+    
+    if results["available"]:
+        report += "🟢 **اليوزرات المتاحة:**\n"
+        for username in results["available"]:
+            report += f"- @{username} (Telegram & Instagram)\n"
+    
+    if results["taken"]:
+        report += "\n🔴 **اليوزرات المحجوزة:**\n"
+        for username in results["taken"]:
+            tg_status = check_platform(username, "telegram")
+            ig_status = check_platform(username, "instagram")
+            report += f"- @{username} (TG: {'🟢' if tg_status == 'available' else '🔴'}, IG: {'🟢' if ig_status == 'available' else '🔴'})\n"
+    
+    try:
+        bot.send_message(CHANNEL_ID, report, parse_mode="Markdown")
+        if results["available"]:
+            bot.send_message(ADMIN_ID, "🚀 يوجد يوزرات متاحة! راجع القناة.")
+    except Exception as e:
+        logger.error(f"فشل إرسال التقرير: {e}")
 
 if __name__ == '__main__':
-    print("⚡ البوت يعمل! أرسل /start_hunt للبدء")
+    logger.info("🔥 البوت يعمل!")
+    try:
+        bot.send_message(
+            CHANNEL_ID,
+            f"🤖 **تم تشغيل البوت بنجاح**\n"
+            f"📅 {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+            f"🔍 جاهز للبحث عن اليوزرات المميزة!",
+            parse_mode="Markdown"
+        )
+    except Exception as e:
+        logger.error(f"فشل إرسال رسالة البدء: {e}")
+    
     bot.polling()
