@@ -4,24 +4,15 @@ import random
 import string
 import logging
 import re
-import concurrent.futures
+import time
+import threading
 from datetime import datetime
 
 # Configuration
 TOKEN = "7087784225:AAF-TUMXou11lHOr5VLRq37PgCEbOBqKH3U"
 CHANNEL_ID = "@mmmmmuyter"
 ADMIN_ID = 5367866254
-MAX_WORKERS = 20  # Increased threads for ultra-fast checking
-bot = telebot.TeleBot(TOKEN, threaded=True)
-
-# Premium Patterns
-PATTERNS = {
-    'rare2': r'^[a-z]{2}$',          # ثنائي نادر (aa)
-    'vip3': r'^[a-z]{3}$',           # ثلاثي فاخر (aaa)
-    'gold4': r'^[a-z]{2}\d{2}$',     # رباعي ذهبي (aa11)
-    'premium5': r'^[a-z]{2}\d[a-z]{2}$',  # خماسي مميز (aa1bb)
-    'platinum': r'^[a-z]\d[a-z]\d$'  # بلاتينيوم (a1b2)
-}
+bot = telebot.TeleBot(TOKEN)
 
 # Logging
 logging.basicConfig(
@@ -32,138 +23,185 @@ logging.basicConfig(
         logging.StreamHandler()
     ]
 )
-logger = logging.getLogger('PremiumHunter')
+logger = logging.getLogger('PremiumHunterPro')
 
-class EliteUsernameGenerator:
+# Premium Patterns
+PATTERNS = {
+    'rare2': r'^[a-z]{2}$',          # ثنائي نادر (aa)
+    'gold2': r'^[a-z]\d$',           # شبه ثنائي (a1)
+    'vip3': r'^[a-z]{3}$',           # ثلاثي فاخر (aaa)
+    'platinum3': r'^[a-z]{2}\d$',    # شبه ثلاثي (aa1)
+    'elite4': r'^[a-z]{2}\d{2}$',    # رباعي ذهبي (aa11)
+    'premium5': r'^[a-z]{2}\d[a-z]{2}$'  # خماسي مميز (aa1bb)
+}
+
+class SmartGenerator:
     @staticmethod
     def generate(pattern):
-        """يولد يوزرات فاخرة حسب النمط المطلوب"""
-        for _ in range(1000):  # محاولات توليد
+        """يولد يوزرات ذكية حسب النمط"""
+        try:
             if pattern == 'rare2':
-                username = random.choice('abcdejklmnpqrstuvwxyz') + random.choice('aeiou')
+                return random.choice('aeioux') + random.choice('bcdfghjklmnpqrstvwxyz')
+            elif pattern == 'gold2':
+                return random.choice('aeioux') + random.choice('123456789')
             elif pattern == 'vip3':
-                username = ''.join(random.choice('aeiouxz') for _ in range(3))
-            elif pattern == 'gold4':
-                username = random.choice(string.ascii_lowercase)*2 + random.choice('13579')*2
+                return ''.join(random.choice('aeioux') for _ in range(3))
+            elif pattern == 'platinum3':
+                return random.choice('aeioux')*2 + random.choice('123456789')
+            elif pattern == 'elite4':
+                return random.choice('aeioux')*2 + random.choice('13579')*2
             elif pattern == 'premium5':
-                username = random.choice('xyz')*2 + random.choice('123') + random.choice('aeiou')*2
-            elif pattern == 'platinum':
-                username = random.choice('aeiou') + random.choice('123') + random.choice('aeiou') + random.choice('456')
-            
-            if re.match(PATTERNS[pattern], username):
-                return username
-        return None
+                return random.choice('aeioux')*2 + random.choice('123') + random.choice('aeioux')*2
+        except Exception as e:
+            logger.error(f"Generation error: {e}")
+            return None
 
 class TurboScanner:
     @staticmethod
     def check(username):
-        """فحص اليوزر على جميع المنصات بسرعة فائقة"""
+        """فحص اليوزر بذكاء"""
         try:
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            }
+            
             # Telegram Check
-            tg = requests.get(f"https://t.me/{username}", timeout=5).text
+            tg = requests.get(
+                f"https://t.me/{username}",
+                headers=headers,
+                timeout=10
+            ).text
             tg_status = 'available' if "You can contact" in tg else 'taken'
             
             # Instagram Check
-            ig = requests.get(f"https://instagram.com/{username}", timeout=5)
+            ig = requests.get(
+                f"https://instagram.com/{username}",
+                headers=headers,
+                timeout=10,
+                allow_redirects=False
+            )
             ig_status = 'available' if ig.status_code == 404 else 'taken'
             
             return {
                 'username': username,
                 'telegram': tg_status,
                 'instagram': ig_status,
-                'value': TurboScanner.estimate_value(username)
+                'value': TurboScanner.calculate_value(username),
+                'time': datetime.now().strftime("%H:%M:%S")
             }
         except Exception as e:
-            logger.error(f"Scan error for @{username}: {e}")
+            logger.error(f"Scan error: {e}")
             return None
 
     @staticmethod
-    def estimate_value(username):
-        """تقدير قيمة اليوزر للسوق السوداء"""
+    def calculate_value(username):
+        """حساب قيمة اليوزر"""
         length = len(username)
-        rarity = 0
+        pattern_score = {
+            'rare2': 100, 'gold2': 80, 'vip3': 70,
+            'platinum3': 60, 'elite4': 50, 'premium5': 40
+        }.get(next((p for p in PATTERNS if re.match(PATTERNS[p], username)), ''), 0)
         
-        # حساب الندرة
-        if re.match(PATTERNS['rare2'], username):
-            rarity = 90
-        elif re.match(PATTERNS['vip3'], username):
-            rarity = 70
-        elif re.match(PATTERNS['gold4'], username):
-            rarity = 50
-        elif re.match(PATTERNS['premium5'], username):
-            rarity = 40
-        elif re.match(PATTERNS['platinum'], username):
-            rarity = 60
-        
-        # عوامل القيمة
         vowels = sum(1 for c in username if c in 'aeiou')
-        patterns = sum(1 for p in PATTERNS if re.match(PATTERNS[p], username))
-        
-        return (rarity + (vowels*5) + (patterns*10)) * length
+        return (pattern_score + vowels * 5) * (10 - length)
 
-class BusinessManager:
-    @staticmethod
-    def create_report(results):
-        """تقرير احترافي مع تقييم مالي"""
-        available = [r for r in results if r and any(r[p] == 'available' for p in ['telegram', 'instagram'])]
-        taken = [r for r in results if r and r not in available]
-        
-        report = "💎 *تقرير اليوزرات الفاخرة*\n\n"
-        
-        if available:
-            report += "🟣 **اليوزرات المتاحة للبيع**\n"
-            for r in sorted(available, key=lambda x: -x['value']):
-                platforms = []
-                if r['telegram'] == 'available':
-                    platforms.append(f"TG: ✅ [رابط](https://t.me/{r['username']})")
-                if r['instagram'] == 'available':
-                    platforms.append(f"IG: ✅ [رابط](https://instagram.com/{r['username']})")
+class HuntingEngine:
+    def __init__(self):
+        self.is_active = False
+        self.session_count = 0
+
+    def start_hunting(self):
+        self.is_active = True
+        threading.Thread(target=self._hunt_loop, daemon=True).start()
+
+    def _hunt_loop(self):
+        while self.is_active:
+            try:
+                # مرحلة الصيد النشط (50 يوزر)
+                self.session_count += 1
+                logger.info(f"🚀 بدأت جلسة الصيد #{self.session_count}")
                 
-                report += (
-                    f"✨ @{r['username']}\n"
-                    f"📊 القيمة: ${r['value']}\n"
-                    f"{' | '.join(platforms)}\n"
-                    f"────────────\n"
-                )
-        
-        if taken:
-            report += "\n🔴 **اليوزرات المحجوزة**\n"
-            for r in taken[:10]:  # عرض أول 10 فقط لتجنب التطويل
-                report += f"@{r['username']} (TG: {'✅' if r['telegram'] == 'available' else '❌'} | IG: {'✅' if r['instagram'] == 'available' else '❌'})\n"
-        
-        report += f"\n💰 *إجمالي اليوزرات القابلة للبيع: {len(available)}*"
-        return report
+                all_results = []
+                for i in range(50):
+                    if not self.is_active:
+                        break
+                        
+                    # توليد يوزر عشوائي من أنماط مختلفة
+                    pattern = random.choice(list(PATTERNS.keys()))
+                    username = SmartGenerator.generate(pattern)
+                    
+                    if username:
+                        result = TurboScanner.check(username)
+                        if result:
+                            all_results.append(result)
+                            self._process_result(result)
+                    
+                    time.sleep(1)  # تأخير بين كل يوزر
+                
+                # إرسال التقرير النهائي
+                self._send_summary(all_results)
+                
+                # استراحة 5 دقائق
+                if self.is_active:
+                    logger.info("⏳ استراحة لمدة 5 دقائق...")
+                    time.sleep(300)
+                    
+            except Exception as e:
+                logger.error(f"Error in hunt loop: {e}")
+                time.sleep(30)
 
-@bot.message_handler(commands=['hunt_vip'])
-def hunt_vip(message):
-    if message.from_user.id != ADMIN_ID:
-        return
-    
-    try:
-        pattern = message.text.split()[1] if len(message.text.split()) > 1 else 'rare2'
-        count = int(message.text.split()[2]) if len(message.text.split()) > 2 else 20
-    except:
-        bot.reply_to(message, "⚡ استخدام: /hunt_vip [النوع] [العدد]\n\nأنواع VIP:\nrare2, vip3, gold4, premium5, platinum")
-        return
-    
-    bot.reply_to(message, f"⚡ بدأ الصيد الذكي لـ {count} يوزر {pattern}...")
-    
-    with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-        usernames = [EliteUsernameGenerator.generate(pattern) for _ in range(count)]
-        results = list(executor.map(TurboScanner.check, usernames))
-    
-    report = BusinessManager.create_report(results)
-    bot.send_message(CHANNEL_ID, report, parse_mode="Markdown", disable_web_page_preview=True)
-    
-    # إرسال أفضل 3 يوزرات للمشرف
-    top_usernames = sorted([r for r in results if r and any(r[p] == 'available' for p in ['telegram', 'instagram'])], 
-                          key=lambda x: -x['value'])[:3]
-    if top_usernames:
-        alert = "🚀 *أفضل اليوزرات المتاحة*\n"
-        for idx, r in enumerate(top_usernames, 1):
-            alert += f"{idx}. @{r['username']} (القيمة: ${r['value']})\n"
-        bot.send_message(ADMIN_ID, alert, parse_mode="Markdown")
+    def _process_result(self, result):
+        """معالجة النتائج الفورية"""
+        if result['telegram'] == 'available' or result['instagram'] == 'available':
+            report = (
+                f"✨ **يوزر متاح!**\n"
+                f"🔹 `@{result['username']}`\n"
+                f"🏷️ النمط: {next(p for p in PATTERNS if re.match(PATTERNS[p], result['username']))}\n"
+                f"💰 القيمة: ${result['value']}\n"
+                f"⏰ الوقت: {result['time']}\n"
+                f"📱 تليجرام: {'🟢' if result['telegram'] == 'available' else '🔴'}\n"
+                f"📷 إنستجرام: {'🟢' if result['instagram'] == 'available' else '🔴'}"
+            )
+            bot.send_message(CHANNEL_ID, report, parse_mode="Markdown")
+
+    def _send_summary(self, results):
+        """إرسال ملخص الجلسة"""
+        available = [r for r in results if r['telegram'] == 'available' or r['instagram'] == 'available']
+        
+        summary = (
+            f"📊 **ملخص جلسة الصيد #{self.session_count}**\n"
+            f"🔢 عدد اليوزرات المفحوصة: {len(results)}\n"
+            f"💎 اليوزرات المتاحة: {len(available)}\n"
+            f"🏆 أفضل يوزر: @{max(results, key=lambda x: x['value'])['username']} (${max(r['value'] for r in results)})\n"
+            f"⏱️ المدة التالية: 5 دقائق استراحة"
+        )
+        bot.send_message(CHANNEL_ID, summary, parse_mode="Markdown")
+
+# Bot Commands
+hunter = HuntingEngine()
+
+@bot.message_handler(commands=['start_hunt'])
+def start_hunting(message):
+    if message.from_user.id == ADMIN_ID:
+        if not hunter.is_active:
+            hunter.start_hunting()
+            bot.reply_to(message, "🎯 بدأ الصيد الذكي! (50 يوزر / 5 دقائق استراحة)")
+        else:
+            bot.reply_to(message, "⚠️ الصيد يعمل بالفعل!")
+    else:
+        bot.reply_to(message, "⛔ ليس لديك صلاحية!")
+
+@bot.message_handler(commands=['stop_hunt'])
+def stop_hunting(message):
+    if message.from_user.id == ADMIN_ID:
+        if hunter.is_active:
+            hunter.is_active = False
+            bot.reply_to(message, "🛑 تم إيقاف الصيد!")
+        else:
+            bot.reply_to(message, "⚠️ الصيد غير نشط بالفعل!")
+    else:
+        bot.reply_to(message, "⛔ ليس لديك صلاحية!")
 
 if __name__ == '__main__':
-    logger.info("💎 Starting Premium Username Hunter")
+    logger.info("🔥 البوت جاهز! أرسل /start_hunt للبدء")
     bot.infinity_polling()
