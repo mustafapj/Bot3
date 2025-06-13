@@ -5,9 +5,9 @@ import logging
 from threading import Thread
 
 # تكوين الإعدادات
-TOKEN = "TOKEN_BOT"  # استبدله بتوكن بوتك
-CHANNEL_ID = "@YOUR_CHANNEL"  # استبدل بإسم قناتك
-ADMIN_IDS = [123456789]  # أضف أي دي حسابك
+TOKEN = "7087784225:AAF-TUMXou11lHOr5VLRq37PgCEbOBqKH3U"  # استبدله بتوكن بوتك
+CHANNEL_ID = "@mmmmmuyter"  # استبدل بإسم قناتك
+ADMIN_IDS = [5367866254]  # أضف أي دي حسابك
 
 # إعداد التسجيل
 logging.basicConfig(
