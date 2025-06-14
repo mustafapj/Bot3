@@ -1,13 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-ULTIMATE USERNAME HUNTER BOT v6.0
-- Advanced pattern generation
-- Multi-layer verification
-- AI-powered availability prediction
-- Proxy support
-- Continuous hunting with smart breaks
-"""
 
 import telebot
 import requests
