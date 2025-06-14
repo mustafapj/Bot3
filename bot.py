@@ -15,16 +15,16 @@ class Config:
         self.ADMIN_ID = 5367866254
         
         # إعدادات الفحص
-        self.REQUEST_TIMEOUT = 10  # زيادة المهلة
-        self.DELAY_BETWEEN_CHECKS = 2  # زيادة التأخير بين الفحوصات
+        self.REQUEST_TIMEOUT = 15  # زيادة المهلة
+        self.DELAY_BETWEEN_CHECKS = 3  # زيادة التأخير بين الفحوصات
         
-        # أنماط اليوزرات لكل موقع
+        # أنماط اليوزرات لكل موقع (تم تحديثها)
         self.PATTERNS = {
-            "instagram": [4, 5, 6],  # ثنائي، ثلاثي، رباعي
+            "instagram": [3, 4, 5],  # ثلاثي، رباعي، خماسي (تم التعديل)
             "telegram": [5, 6, 7],   # خماسي، سداسي، سباعي
-            "twitter": [3, 4, 5],    # ثلاثي، رباعي، خماسي
-            "snapchat": [3, 4, 5],   # ثلاثي، رباعي، خماسي
-            "tiktok": [4, 5, 6]      # رباعي، خماسي، سداسي
+            "twitter": [4, 5, 6],    # رباعي، خماسي، سداسي
+            "snapchat": [4, 5, 6],   # رباعي، خماسي، سداسي
+            "tiktok": [5, 6, 7]      # خماسي، سداسي، سباعي
         }
 
 # =============== GENERATOR ===============
@@ -40,7 +40,7 @@ class UsernameGenerator:
             chars = string.ascii_lowercase + string.digits
         return ''.join(random.choices(chars, k=length))
 
-# =============== CHECKER (FIXED) ===============
+# =============== CHECKER (محسن) ===============
 class Checker:
     def __init__(self, config):
         self.config = config
@@ -50,40 +50,59 @@ class Checker:
             'Accept-Language': 'en-US,en;q=0.9'
         }
 
-    def check(self, username, platform):
+    def check_instagram(self, username):
         try:
-            if platform == "instagram":
-                url = f"https://www.instagram.com/{username}/?__a=1"
-                response = self.session.get(url, timeout=self.config.REQUEST_TIMEOUT)
-                return response.status_code == 404
+            # طريقة أكثر دقة للتحقق من إنستجرام
+            url = f"https://www.instagram.com/{username}/?__a=1"
+            response = self.session.get(url, timeout=self.config.REQUEST_TIMEOUT)
             
-            elif platform == "telegram":
-                url = f"https://t.me/{username}"
-                response = self.session.get(url, timeout=self.config.REQUEST_TIMEOUT)
-                return "tgme_username_link" not in response.text
-            
-            elif platform == "twitter":
-                url = f"https://twitter.com/{username}"
-                response = self.session.get(url, timeout=self.config.REQUEST_TIMEOUT, 
-                                          allow_redirects=False)
-                return response.status_code in [404, 302]
-            
-            elif platform == "snapchat":
-                url = f"https://www.snapchat.com/add/{username}"
-                response = self.session.get(url, timeout=self.config.REQUEST_TIMEOUT,
-                                          allow_redirects=False)
-                return response.status_code == 404
-            
-            elif platform == "tiktok":
-                url = f"https://www.tiktok.com/@{username}"
-                response = self.session.get(url, timeout=self.config.REQUEST_TIMEOUT,
-                                          allow_redirects=False)
-                return response.status_code == 404
-            
+            # 404 يعني غير موجود
+            # 200 يعني موجود ولكن قد يكون محذوف
+            if response.status_code == 404:
+                return True
+            elif response.status_code == 200:
+                try:
+                    data = response.json()
+                    return 'graphql' not in data or 'user' not in data['graphql']
+                except:
+                    return False
             return False
         except Exception as e:
-            logging.error(f"Error checking {platform}: {str(e)}")
+            logging.error(f"Instagram check error: {str(e)}")
             return False
+
+    def check_telegram(self, username):
+        try:
+            url = f"https://t.me/{username}"
+            response = self.session.get(url, timeout=self.config.REQUEST_TIMEOUT)
+            
+            # علامات توفر اليوزر في تليجرام
+            unavailable_markers = [
+                "tgme_username_link",
+                "You can contact",
+                "Send Message"
+            ]
+            return not any(marker in response.text for marker in unavailable_markers)
+        except Exception as e:
+            logging.error(f"Telegram check error: {str(e)}")
+            return False
+
+    def check(self, username, platform):
+        if platform == "instagram":
+            return self.check_instagram(username)
+        elif platform == "telegram":
+            return self.check_telegram(username)
+        elif platform == "twitter":
+            return self.check_twitter(username)
+        elif platform == "snapchat":
+            return self.check_snapchat(username)
+        elif platform == "tiktok":
+            return self.check_tiktok(username)
+        return False
+
+    # ... [بقية دوال الفحص لكل منصة] ...
+
+# ... [بقية الكود بدون تغيير] ...
 
 # =============== HUNTER ===============
 class Hunter:
