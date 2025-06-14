@@ -16,15 +16,15 @@ class Config:
         
         # إعدادات الفحص
         self.REQUEST_TIMEOUT = 5
-        self.DELAY_BETWEEN_CHECKS = 1  # تأخير بين الفحوصات (ثانية)
+        self.DELAY_BETWEEN_CHECKS = 1
         
         # أنماط اليوزرات لكل موقع
         self.PATTERNS = {
-            "instagram": [2, 3, 4],  # ثنائي، ثلاثي، رباعي
-            "telegram": [5, 6, 7],    # خماسي، سداسي، سباعي
-            "twitter": [3, 4, 5],     # ثلاثي، رباعي، خماسي
-            "snapchat": [3, 4, 5],    # ثلاثي، رباعي، خماسي
-            "tiktok": [4, 5, 6]       # رباعي، خماسي، سداسي
+            "instagram": [2, 3, 4],
+            "telegram": [5, 6, 7],
+            "twitter": [3, 4, 5],
+            "snapchat": [3, 4, 5],
+            "tiktok": [4, 5, 6]
         }
 
 # =============== GENERATOR ===============
@@ -86,17 +86,34 @@ class Hunter:
         self.generator = UsernameGenerator(config)
         self.checker = Checker(config)
         self.running = False
-    
-    def start(self):
+        self.active_platforms = set()  # المنصات النشطة
+
+    def start(self, platform=None):
+        if platform:
+            self.active_platforms.add(platform)
         self.running = True
-        threading.Thread(target=self.hunt_loop, daemon=True).start()
-    
-    def stop(self):
-        self.running = False
-    
+        if not hasattr(self, 'thread') or not self.thread.is_alive():
+            self.thread = threading.Thread(target=self.hunt_loop, daemon=True)
+            self.thread.start()
+        return True
+
+    def stop(self, platform=None):
+        if platform:
+            self.active_platforms.discard(platform)
+            if not self.active_platforms:
+                self.running = False
+        else:
+            self.active_platforms.clear()
+            self.running = False
+        return True
+
     def hunt_loop(self):
         while self.running:
-            for platform in self.config.PATTERNS:
+            if not self.active_platforms:
+                time.sleep(1)
+                continue
+                
+            for platform in list(self.active_platforms):
                 username = self.generator.generate(platform)
                 if self.checker.check(username, platform):
                     self.send_result(username, platform)
@@ -116,7 +133,7 @@ class Hunter:
         except Exception as e:
             logging.error(f"Error sending message: {e}")
 
-# =============== أوامر البوت ===============
+# =============== BOT COMMANDS ===============
 config = Config()
 bot = telebot.TeleBot(config.TOKEN)
 hunter = Hunter(bot, config)
@@ -124,22 +141,69 @@ hunter = Hunter(bot, config)
 @bot.message_handler(commands=['start'])
 def start(message):
     if message.from_user.id != config.ADMIN_ID:
-        bot.reply_to(message, "❌ **غير مصرح لك!**")
+        bot.reply_to(message, "❌ غير مصرح لك!")
         return
     
-    hunter.start()
-    bot.reply_to(message, "✅ **تم تشغيل البوت! اليوزرات ستظهر مباشرة في القناة.**")
+    hunter.start()  # بدء جميع المنصات
+    bot.reply_to(message, "✅ تم تشغيل البوت على جميع المنصات!")
 
 @bot.message_handler(commands=['stop'])
 def stop(message):
     if message.from_user.id != config.ADMIN_ID:
-        bot.reply_to(message, "❌ **غير مصرح لك!**")
+        bot.reply_to(message, "❌ غير مصرح لك!")
         return
     
-    hunter.stop()
-    bot.reply_to(message, "🛑 **تم إيقاف البوت!**")
+    hunter.stop()  # إيقاف جميع المنصات
+    bot.reply_to(message, "🛑 تم إيقاف البوت على جميع المنصات!")
 
-# =============== تشغيل البوت ===============
+@bot.message_handler(commands=['telegram', 'instagram', 'twitter', 'snapchat', 'tiktok'])
+def handle_platform(message):
+    if message.from_user.id != config.ADMIN_ID:
+        bot.reply_to(message, "❌ غير مصرح لك!")
+        return
+    
+    platform = message.text[1:]  # إزالة علامة الـ /
+    
+    if platform in ['telegram', 'instagram', 'twitter', 'snapchat', 'tiktok']:
+        if platform in hunter.active_platforms:
+            hunter.stop(platform)
+            bot.reply_to(message, f"⏸️ تم إيقاف الصيد على {platform.capitalize()}")
+        else:
+            hunter.start(platform)
+            bot.reply_to(message, f"▶️ تم بدء الصيد على {platform.capitalize()}")
+    else:
+        bot.reply_to(message, "⚠️ أمر غير صحيح!")
+
+@bot.message_handler(commands=['status'])
+def status(message):
+    if message.from_user.id != config.ADMIN_ID:
+        bot.reply_to(message, "❌ غير مصرح لك!")
+        return
+    
+    status_msg = "📊 حالة المنصات:\n"
+    for platform in ['telegram', 'instagram', 'twitter', 'snapchat', 'tiktok']:
+        status_msg += f"{platform.capitalize()}: {'🟢 نشط' if platform in hunter.active_platforms else '🔴 متوقف'}\n"
+    
+    bot.reply_to(message, status_msg)
+
+@bot.message_handler(commands=['help'])
+def help(message):
+    help_text = """
+⚡ أوامر البوت:
+/start - بدء الصيد على جميع المنصات
+/stop - إيقاف الصيد على جميع المنصات
+/status - عرض حالة المنصات
+
+🔧 أوامر المنصات (تشغيل/إيقاف):
+/telegram - تيليجرام
+/instagram - إنستجرام
+/twitter - تويتر
+/snapchat - سناب شات
+/tiktok - تيك توك
+"""
+    bot.reply_to(message, help_text)
+
+# =============== RUN BOT ===============
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
     logging.info("Bot started...")
