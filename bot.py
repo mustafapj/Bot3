@@ -1,15 +1,13 @@
-
 import telebot
-import requests 
-import random 
+import requests
+import random
 import string
-import logging 
-import re 
-import time 
-import threading 
-import json*
-import datetime
-
+import logging
+import re
+import time
+import threading
+import json
+from datetime import datetime
 =============== CONFIGURATION ===============
 
 class Config: def init(self): self.TOKEN = "7087784225:AAF-TUMXou11lHOr5VLRq37PgCEbOBqKH3U" self.CHANNEL_ID = "@mmmmmuyter" self.ADMIN_ID = 5367866254 self.MAX_THREADS = 10 self.REQUEST_TIMEOUT = 7 self.BREAK_DURATION = 120  # بعد كل 100 عملية فحص self.PROXY_ENABLED = True self.PROXY_LIST = [ 'http://proxy1.example.com:8080', 'http://proxy2.example.com:8080' ]
