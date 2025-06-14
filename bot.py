@@ -20,10 +20,10 @@ class Config:
         
         # أنماط اليوزرات لكل موقع
         self.PATTERNS = {
-            "instagram": [2, 3, 4],
+            "instagram": [3, 4, 5],
             "telegram": [5, 6, 7],
             "twitter": [3, 4, 5],
-            "snapchat": [3, 4, 5],
+            "snapchat": [4, 5, 6],
             "tiktok": [4, 5, 6]
         }
 
