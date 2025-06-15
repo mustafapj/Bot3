@@ -16,15 +16,25 @@ class Config:
         
         # إعدادات الفحص
         self.REQUEST_TIMEOUT = 15
-        self.DELAY_BETWEEN_CHECKS = 3
+        self.DELAY_BETWEEN_CHECKS = 5
         
-        # أنماط اليوزرات لكل موقع
+        # قائمة بروكسيات فعالة (تم اختبارها)
+        self.PROXY_LIST = [
+            "http://45.61.139.48:8011",
+            "http://72.10.160.90:11537",
+            "http://98.162.25.29:31679",
+            "http://72.10.164.178:22671",
+            "http://45.61.139.48:8080",
+            "http://45.61.139.48:8000"
+        ]
+        
+        # أنماط اليوزرات
         self.PATTERNS = {
-            "instagram": [3, 4, 5],  # ثلاثي، رباعي، خماسي
-            "telegram": [5, 6, 7],   # خماسي، سداسي، سباعي
-            "twitter": [4, 5, 6],    # رباعي، خماسي، سداسي
-            "snapchat": [4, 5, 6],   # رباعي، خماسي، سداسي
-            "tiktok": [5, 6, 7]      # خماسي، سداسي، سباعي
+            "instagram": [3, 4, 5],
+            "telegram": [5, 6, 7],
+            "twitter": [4, 5, 6],
+            "snapchat": [4, 5, 6],
+            "tiktok": [5, 6, 7]
         }
 
 # =============== GENERATOR ===============
@@ -40,14 +50,22 @@ class UsernameGenerator:
             chars = string.ascii_lowercase + string.digits
         return ''.join(random.choices(chars, k=length))
 
-# =============== CHECKER ===============
+# =============== CHECKER مع بروكسي ===============
 class Checker:
     def __init__(self, config):
         self.config = config
         self.session = requests.Session()
+        self.current_proxy = None
+        self.update_proxy()
+        
+    def update_proxy(self):
+        self.current_proxy = random.choice(self.config.PROXY_LIST)
+        self.session.proxies = {
+            "http": self.current_proxy,
+            "https": self.current_proxy
+        }
         self.session.headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-            'Accept-Language': 'en-US,en;q=0.9'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         }
 
     def check_instagram(self, username):
@@ -56,15 +74,18 @@ class Checker:
             response = self.session.get(url, timeout=self.config.REQUEST_TIMEOUT)
             if response.status_code == 404:
                 return True
-            elif response.status_code == 200:
-                try:
-                    data = response.json()
-                    return 'graphql' not in data or 'user' not in data['graphql']
-                except:
-                    return False
             return False
-        except Exception as e:
-            logging.error(f"Instagram check error: {str(e)}")
+        except:
+            self.update_proxy()
+            return False
+
+    def check_tiktok(self, username):
+        try:
+            url = f"https://www.tiktok.com/@{username}"
+            response = self.session.get(url, timeout=self.config.REQUEST_TIMEOUT, allow_redirects=False)
+            return response.status_code == 404
+        except:
+            self.update_proxy()
             return False
 
     def check_telegram(self, username):
@@ -97,15 +118,6 @@ class Checker:
             return response.status_code == 404
         except Exception as e:
             logging.error(f"Snapchat check error: {str(e)}")
-            return False
-
-    def check_tiktok(self, username):
-        try:
-            url = f"https://www.tiktok.com/@{username}"
-            response = self.session.get(url, timeout=self.config.REQUEST_TIMEOUT, allow_redirects=False)
-            return response.status_code == 404
-        except Exception as e:
-            logging.error(f"TikTok check error: {str(e)}")
             return False
 
     def check(self, username, platform):
