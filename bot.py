@@ -15,26 +15,16 @@ class Config:
         self.ADMIN_ID = 5367866254
         
         # إعدادات الفحص
-        self.REQUEST_TIMEOUT = 15
-        self.DELAY_BETWEEN_CHECKS = 5
-        
-        # قائمة بروكسيات فعالة (تم اختبارها)
-        self.PROXY_LIST = [
-            "http://45.61.139.48:8011",
-            "http://72.10.160.90:11537",
-            "http://98.162.25.29:31679",
-            "http://72.10.164.178:22671",
-            "http://45.61.139.48:8080",
-            "http://45.61.139.48:8000"
-        ]
+        self.REQUEST_TIMEOUT = 10
+        self.DELAY_BETWEEN_CHECKS = 5  # تأخير أكبر بين الطلبات
         
         # أنماط اليوزرات
         self.PATTERNS = {
-            "instagram": [3, 4, 5],
-            "telegram": [5, 6, 7],
-            "twitter": [4, 5, 6],
-            "snapchat": [4, 5, 6],
-            "tiktok": [5, 6, 7]
+            "instagram": [3, 4, 5],  # ثلاثي، رباعي، خماسي
+            "telegram": [5, 6, 7],   # خماسي، سداسي، سباعي
+            "twitter": [4, 5, 6],    # رباعي، خماسي، سداسي
+            "snapchat": [4, 5, 6],   # رباعي، خماسي، سداسي
+            "tiktok": [5, 6, 7]      # خماسي، سداسي، سباعي
         }
 
 # =============== GENERATOR ===============
@@ -50,33 +40,46 @@ class UsernameGenerator:
             chars = string.ascii_lowercase + string.digits
         return ''.join(random.choices(chars, k=length))
 
-# =============== CHECKER مع بروكسي ===============
+# =============== CHECKER (بدون بروكسي) ===============
 class Checker:
     def __init__(self, config):
         self.config = config
         self.session = requests.Session()
-        self.current_proxy = None
-        self.update_proxy()
-        
-    def update_proxy(self):
-        self.current_proxy = random.choice(self.config.PROXY_LIST)
-        self.session.proxies = {
-            "http": self.current_proxy,
-            "https": self.current_proxy
-        }
         self.session.headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Accept-Language': 'en-US,en;q=0.9'
         }
 
     def check_instagram(self, username):
         try:
             url = f"https://www.instagram.com/{username}/?__a=1"
             response = self.session.get(url, timeout=self.config.REQUEST_TIMEOUT)
-            if response.status_code == 404:
-                return True
-            return False
+            return response.status_code == 404
         except:
-            self.update_proxy()
+            return False
+
+    def check_telegram(self, username):
+        try:
+            url = f"https://t.me/{username}"
+            response = self.session.get(url, timeout=self.config.REQUEST_TIMEOUT)
+            return "tgme_username_link" not in response.text
+        except:
+            return False
+
+    def check_twitter(self, username):
+        try:
+            url = f"https://twitter.com/{username}"
+            response = self.session.get(url, timeout=self.config.REQUEST_TIMEOUT, allow_redirects=False)
+            return response.status_code in [404, 302]
+        except:
+            return False
+
+    def check_snapchat(self, username):
+        try:
+            url = f"https://www.snapchat.com/add/{username}"
+            response = self.session.get(url, timeout=self.config.REQUEST_TIMEOUT, allow_redirects=False)
+            return response.status_code == 404
+        except:
             return False
 
     def check_tiktok(self, username):
@@ -85,39 +88,6 @@ class Checker:
             response = self.session.get(url, timeout=self.config.REQUEST_TIMEOUT, allow_redirects=False)
             return response.status_code == 404
         except:
-            self.update_proxy()
-            return False
-
-    def check_telegram(self, username):
-        try:
-            url = f"https://t.me/{username}"
-            response = self.session.get(url, timeout=self.config.REQUEST_TIMEOUT)
-            unavailable_markers = [
-                "tgme_username_link",
-                "You can contact",
-                "Send Message"
-            ]
-            return not any(marker in response.text for marker in unavailable_markers)
-        except Exception as e:
-            logging.error(f"Telegram check error: {str(e)}")
-            return False
-
-    def check_twitter(self, username):
-        try:
-            url = f"https://twitter.com/{username}"
-            response = self.session.get(url, timeout=self.config.REQUEST_TIMEOUT, allow_redirects=False)
-            return response.status_code in [404, 302]
-        except Exception as e:
-            logging.error(f"Twitter check error: {str(e)}")
-            return False
-
-    def check_snapchat(self, username):
-        try:
-            url = f"https://www.snapchat.com/add/{username}"
-            response = self.session.get(url, timeout=self.config.REQUEST_TIMEOUT, allow_redirects=False)
-            return response.status_code == 404
-        except Exception as e:
-            logging.error(f"Snapchat check error: {str(e)}")
             return False
 
     def check(self, username, platform):
