@@ -5,7 +5,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 # الطريقة الصحيحة لقراءة التوكن
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "7087784225:AAF-TUMXou11lHOr5VLRq37PgCEbOBqKH3U")
 DEVELOPER_USERNAME = "@pw19k"
-REQUIRED_CHANNEL = "@pw19k"
+REQUIRED_CHANNEL = "@e2m_2"
 
 if not BOT_TOKEN:
     raise ValueError("لم يتم تعيين توكن البوت!")
