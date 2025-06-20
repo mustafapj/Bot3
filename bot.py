@@ -8,11 +8,10 @@ BOT_TOKEN = "7087784225:AAF-TUMXou11lHOr5VLRq37PgCEbOBqKH3U"
 # تعريف الأزرار الرئيسية
 MAIN_KEYBOARD = ReplyKeyboardMarkup(
     [
-        ["الاستفسار", "الاسعار"],
-        ["الخدمات"]
+        ["⚜️ الاستفسار", "⚜️ الاسعار"],
+        ["⚜️ الخدمات"]
     ],
-    resize_keyboard=True,
-    persistent=True
+    resize_keyboard=True
 )
 
 async def start(update: Update, context: CallbackContext) -> None:
@@ -24,43 +23,46 @@ async def start(update: Update, context: CallbackContext) -> None:
 async def handle_messages(update: Update, context: CallbackContext) -> None:
     text = update.message.text
     
-    if text == "الاستفسار":
+    if "الاستفسار" in text:
         response_text = f"""
-        للاستفسار، يرجى التواصل مع المطور مباشرة:
+        ⚜️ للاستفسار، يرجى التواصل مع المطور مباشرة:
         {DEVELOPER_USERNAME}
         """
         await update.message.reply_text(response_text)
     
-    elif text == "الاسعار":
+    elif "الاسعار" in text:
         prices_text = f"""
-        🏷️ أسعار خدمات قنوات تيليجرام:
+        ⚜️ عروض الأسعار:
+        
+        ⚜️ شراء جروبات تيليجرام إنشاء 2022:
+        من 5 دولار إلى 10 دولار
+        
+        ⚜️ شراء جروبات تيليجرام إنشاء 2023:
+        من 1 دولار إلى 3 دولار
 
-        • جروب تيليجرام إنشاء 2022: من 5$ إلى 10$
-        • إنشاء حساب تيليجرام: (ليس إنشاء جروب) من 1$ إلى 3$
-        • جروب تيليجرام إنشاء 2023: من 1$ إلى 3$
-
-        للطلب أو الاستفسار، تواصل مع المطور:
+        ⚜️ للطلب أو الاستفسار، تواصل مع المطور:
         {DEVELOPER_USERNAME}
         """
         await update.message.reply_text(prices_text)
     
-    elif text == "الخدمات":
+    elif "الخدمات" in text:
         services_text = f"""
-        🛠️ الخدمات المتاحة:
+        ⚜️ قائمة الخدمات المتاحة:
 
-        1. إنشاء مواقع ويب
-        2. إنشاء التطبيقات المصغرة
-        3. دعم وزيادة متابعين انستقرام
-        4. دعم وزيادة أعضاء تيليجرام
+        ⚜️ إنشاء مواقع ويب
+        ⚜️ إنشاء التطبيقات المصغرة
+        ⚜️ إنشاء بوتات تيليجرام
+        ⚜️ دعم وزيادة متابعين انستقرام
+        ⚜️ دعم وزيادة أعضاء تيليجرام
 
-        للطلب أو الاستفسار، تواصل مع المطور:
+        ⚜️ للطلب أو الاستفسار، تواصل مع المطور:
         {DEVELOPER_USERNAME}
         """
         await update.message.reply_text(services_text)
     
     else:
         await update.message.reply_text(
-            "اختر أحد الخيارات من الأزرار أدناه:",
+            "⚜️ اختر أحد الخيارات من الأزرار أدناه:",
             reply_markup=MAIN_KEYBOARD
         )
 
