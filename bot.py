@@ -11,7 +11,7 @@ from telegram.ext import (
 
 # بيانات المطور
 DEVELOPER_USERNAME = "@pw19k"
-BOT_TOKEN =os.getenv("7087784225:AAF-TUMXou11lHOr5VLRq37PgCEbOBqKH3U") 
+BOT_TOKEN =os.getenv.get("7087784225:AAF-TUMXou11lHOr5VLRq37PgCEbOBqKH3U") 
 REQUIRED_CHANNEL = "@e2m_2"  # قناة الاشتراك الإجباري
 
 # تعريف الأزرار الرئيسية
