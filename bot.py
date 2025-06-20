@@ -11,7 +11,7 @@ from telegram.ext import (
 # بيانات المطور
 DEVELOPER_USERNAME = "@pw19k"
 BOT_TOKEN = "7087784225:AAF-TUMXou11lHOr5VLRq37PgCEbOBqKH3U"
-REQUIRED_CHANNEL = "@pw19k"  # قناة الاشتراك الإجباري
+REQUIRED_CHANNEL = "@e2m_2"  # قناة الاشتراك الإجباري
 
 # تعريف الأزرار الرئيسية
 MAIN_KEYBOARD = ReplyKeyboardMarkup(
