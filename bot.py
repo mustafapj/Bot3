@@ -1,5 +1,12 @@
 from telegram import ReplyKeyboardMarkup, Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    MessageHandler,
+    filters,
+    ContextTypes,
+    CallbackQueryHandler  # تمت إضافته هنا
+)
 
 # بيانات المطور
 DEVELOPER_USERNAME = "@pw19k"
@@ -43,11 +50,9 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     
     await update.message.reply_text(
         "مرحباً بك في بوت الخدمات! اختر أحد الخيارات من الأزرار أدناه:",
-        reply_markup=MAIN_KEYBOARD
-    )
+        reply_markup=MAIN_KEYBOARD)
 
 async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    # التحقق من الاشتراك أولاً
     if not await check_subscription(update.effective_user.id, context):
         await send_subscription_message(update.effective_chat.id, context)
         return
@@ -56,8 +61,7 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     
     if "الاستفسار" in text:
         await update.message.reply_text(
-            f"⚜️ للاستفسار، يرجى التواصل مع المطور مباشرة:\n{DEVELOPER_USERNAME}"
-        )
+            f"⚜️ للاستفسار، يرجى التواصل مع المطور مباشرة:\n{DEVELOPER_USERNAME}")
     
     elif "الاسعار" in text:
         prices_text = f"""
@@ -70,8 +74,7 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         من 1 دولار إلى 3 دولار
 
         ⚜️ للطلب أو الاستفسار:
-        {DEVELOPER_USERNAME}
-        """
+        {DEVELOPER_USERNAME}"""
         await update.message.reply_text(prices_text)
     
     elif "الخدمات" in text:
@@ -85,18 +88,15 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         ⚜️ دعم وزيادة أعضاء تيليجرام
 
         ⚜️ للطلب أو الاستفسار:
-        {DEVELOPER_USERNAME}
-        """
+        {DEVELOPER_USERNAME}"""
         await update.message.reply_text(services_text)
     
     else:
         await update.message.reply_text(
             "⚜️ اختر أحد الخيارات من الأزرار أدناه:",
-            reply_markup=MAIN_KEYBOARD
-        )
+            reply_markup=MAIN_KEYBOARD)
 
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """معالجة ضغط زر التحقق من الاشتراك"""
     query = update.callback_query
     await query.answer()
     
@@ -104,15 +104,15 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         if await check_subscription(query.from_user.id, context):
             await query.edit_message_text(
                 text="✅ تم التحقق من اشتراكك بنجاح! يمكنك الآن استخدام البوت.",
-                reply_markup=None
-            )
+                reply_markup=None)
             await context.bot.send_message(
                 chat_id=query.message.chat_id,
                 text="مرحباً بك! اختر أحد الخيارات من الأزرار أدناه:",
-                reply_markup=MAIN_KEYBOARD
-            )
+                reply_markup=MAIN_KEYBOARD)
         else:
-            await query.answer("⚠️ لم يتم الاشتراك بعد! الرجاء الاشتراك ثم الضغط على التحقق", show_alert=True)
+            await query.answer(
+                "⚠️ لم يتم الاشتراك بعد! الرجاء الاشتراك ثم الضغط على التحقق",
+                show_alert=True)
 
 def main() -> None:
     application = Application.builder().token(BOT_TOKEN).build()
