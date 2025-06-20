@@ -1,44 +1,44 @@
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, CallbackContext
+from telegram.ext import Updater, CommandHandler, CallbackQueryHandler, CallbackContext, Application
 
 # بيانات المطور
 DEVELOPER_USERNAME = "@pw19k"
 BOT_TOKEN = "7087784225:AAF-TUMXou11lHOr5VLRq37PgCEbOBqKH3U"
 
-def start(update: Update, context: CallbackContext) -> None:
+async def start(update: Update, context: CallbackContext) -> None:
     keyboard = [
         [InlineKeyboardButton("الاستفسار", callback_data='inquiry')],
         [InlineKeyboardButton("الاسعار", callback_data='prices')],
         [InlineKeyboardButton("الخدمات", callback_data='services')]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    update.message.reply_text('مرحباً! اختر أحد الخيارات:', reply_markup=reply_markup)
+    await update.message.reply_text('مرحباً! اختر أحد الخيارات:', reply_markup=reply_markup)
 
-def button(update: Update, context: CallbackContext) -> None:
+async def button(update: Update, context: CallbackContext) -> None:
     query = update.callback_query
-    query.answer()
+    await query.answer()
 
     if query.data == 'inquiry':
-        response_text = """
+        response_text = f"""
         للاستفسار، يرجى التواصل مع المطور مباشرة:
-        {}
-        """.format(DEVELOPER_USERNAME)
-        query.edit_message_text(text=response_text)
+        {DEVELOPER_USERNAME}
+        """
+        await query.edit_message_text(text=response_text)
     
     elif query.data == 'prices':
-        prices_text = """
+        prices_text = f"""
         🏷️ أسعار خدمات قنوات تيليجرام:
 
         • جروب تيليجرام إنشاء 2022: من 5$ إلى 10$
         • جروب تيليجرام إنشاء 2023: من 1$ إلى 3$
 
         للطلب أو الاستفسار، تواصل مع المطور:
-        {}
-        """.format(DEVELOPER_USERNAME)
-        query.edit_message_text(text=prices_text)
+        {DEVELOPER_USERNAME}
+        """
+        await query.edit_message_text(text=prices_text)
     
     elif query.data == 'services':
-        services_text = """
+        services_text = f"""
         🛠️ الخدمات المتاحة:
 
         1. إنشاء مواقع ويب
@@ -47,18 +47,17 @@ def button(update: Update, context: CallbackContext) -> None:
         4. دعم وزيادة أعضاء تيليجرام
 
         للطلب أو الاستفسار، تواصل مع المطور:
-        {}
-        """.format(DEVELOPER_USERNAME)
-        query.edit_message_text(text=services_text)
+        {DEVELOPER_USERNAME}
+        """
+        await query.edit_message_text(text=services_text)
 
 def main() -> None:
-    updater = Updater(BOT_TOKEN)
+    application = Application.builder().token(BOT_TOKEN).build()
     
-    updater.dispatcher.add_handler(CommandHandler('start', start))
-    updater.dispatcher.add_handler(CallbackQueryHandler(button))
+    application.add_handler(CommandHandler('start', start))
+    application.add_handler(CallbackQueryHandler(button))
 
-    updater.start_polling()
-    updater.idle()
+    application.run_polling()
 
 if __name__ == '__main__':
     main()
