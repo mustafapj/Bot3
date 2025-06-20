@@ -1,8 +1,10 @@
 import os
+import threading
+from flask import Flask
 from telegram import Update, ReplyKeyboardMarkup, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, CallbackQueryHandler
 
-# الطريقة الصحيحة لقراءة التوكن
+# 🔐 قراءة التوكن
 BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "7087784225:AAF-TUMXou11lHOr5VLRq37PgCEbOBqKH3U")
 DEVELOPER_USERNAME = "@pw19k"
 REQUIRED_CHANNEL = "@e2m_2"
@@ -10,7 +12,20 @@ REQUIRED_CHANNEL = "@e2m_2"
 if not BOT_TOKEN:
     raise ValueError("لم يتم تعيين توكن البوت!")
 
-# تعريف الأزرار الرئيسية
+# ✅ إعداد واجهة Flask للسيرفر
+app_web = Flask('')
+
+@app_web.route('/')
+def home():
+    return "✅ البوت يعمل بنجاح"
+
+def run_flask():
+    app_web.run(host='0.0.0.0', port=8080)
+
+# 🚀 تشغيل Flask في Thread منفصل
+threading.Thread(target=run_flask).start()
+
+# ✅ الكيبورد الأساسي
 MAIN_KEYBOARD = ReplyKeyboardMarkup(
     [
         ["⚜️ الاستفسار", "⚜️ الاسعار"],
@@ -19,6 +34,7 @@ MAIN_KEYBOARD = ReplyKeyboardMarkup(
     resize_keyboard=True
 )
 
+# ✅ التحقق من الاشتراك
 async def check_subscription(user_id: int, context: ContextTypes.DEFAULT_TYPE) -> bool:
     try:
         member = await context.bot.get_chat_member(REQUIRED_CHANNEL, user_id)
@@ -27,6 +43,7 @@ async def check_subscription(user_id: int, context: ContextTypes.DEFAULT_TYPE) -
         print(f"خطأ في التحقق من الاشتراك: {e}")
         return False
 
+# ✅ أمر /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not await check_subscription(update.effective_user.id, context):
         keyboard = [
@@ -42,6 +59,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         "مرحباً بك في بوت الخدمات! اختر أحد الخيارات من الأزرار أدناه:",
         reply_markup=MAIN_KEYBOARD)
 
+# ✅ التعامل مع الرسائل النصية
 async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not await check_subscription(update.effective_user.id, context):
         await start(update, context)
@@ -54,7 +72,7 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     
     elif "الاسعار" in text:
         await update.message.reply_text(f"""⚜️ عروض الأسعار:
-        
+
 ⚜️ شراء جروبات تيليجرام إنشاء 2022:
 من 5 دولار إلى 10 دولار
 
@@ -76,6 +94,7 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 ⚜️ للطلب أو الاستفسار:
 {DEVELOPER_USERNAME}""")
 
+# ✅ عند الضغط على زر Inline
 async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
     await query.answer()
@@ -90,6 +109,7 @@ async def button_callback(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         else:
             await query.answer("⚠️ لم يتم الاشتراك بعد!", show_alert=True)
 
+# ✅ تشغيل البوت
 def main() -> None:
     application = Application.builder().token(BOT_TOKEN).build()
     
