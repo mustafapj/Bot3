@@ -10,16 +10,19 @@ from telegram.ext import (
     CallbackQueryHandler
 )
 
+# 📁 استيراد الإعدادات من ملف config
+try:
+    from config import *
+except ImportError:
+    print("❌ خطأ: لم يتم العثور على ملف config.py")
+    print("📝 يرجى إنشاء ملف config.py وإضافة التوكن والإعدادات")
+    exit(1)
+
 # 🔧 إعدادات البوت
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
 )
-
-# ⚙️ إعدادات القناة والمطور
-CHANNEL_USERNAME = "MASTFA_20022"  # بدون @
-DEVELOPER_USERNAME = "pw19k"  # حسابك الشخصي - مستثنى من الاشتراك
-BOT_USERNAME = "YOUR_BOT_USERNAME"  # ضع يوزر البوت هنا
 
 async def check_channel_subscription(user_id: int, bot) -> bool:
     """التحقق من اشتراك المستخدم في القناة"""
@@ -210,17 +213,20 @@ async def set_bot_commands(application):
     await application.bot.set_my_commands(commands)
 
 def main():
-    # 🔑 ضع توكن البوت هنا
-    TOKEN = "YOUR_BOT_TOKEN_HERE"
+    # ✅ التحقق من وجود التوكن
+    if BOT_TOKEN == "YOUR_BOT_TOKEN_HERE" or BOT_TOKEN == "1234567890:ABCdefGHIjklMNOpqrsTUVwxyz":
+        print("❌ خطأ: لم تقم بتعيين التوكن في config.py")
+        print("📝 يرجى فتح ملف config.py وإضافة التوكن الحقيقي")
+        return
     
     # 🚀 إنشاء التطبيق مع إعدادات محسنة
     application = (
         Application.builder()
-        .token(TOKEN)
-        .read_timeout(30)
-        .write_timeout(30)
-        .connect_timeout(30)
-        .pool_timeout(30)
+        .token(BOT_TOKEN)
+        .read_timeout(READ_TIMEOUT)
+        .write_timeout(WRITE_TIMEOUT)
+        .connect_timeout(CONNECT_TIMEOUT)
+        .pool_timeout(POOL_TIMEOUT)
         .build()
     )
     
