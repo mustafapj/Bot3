@@ -210,7 +210,7 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await send_subscription_message(update, context)
             return
         
-        await query.message.reply_text("🎵 **استخدم الأوامر التالية:**\n\n`شغل اسم الأغنية` - للتشغيل المباشر\n`ابحث اسم الأغنية` - للبحث\n`يوت اسم الأغنية` - للتحميل")
+        await query.message.reply_text("🎵 **استخدم الأوامر التالية:**\n\n`شغل اسم الأغنية` - للتشغيل المباشر\n`بحث اسم الأغنية` - للبحث\n`يوت اسم الأغنية` - للتحميل")
 
 # 🎵 معالجة الأوامر النصية في المجموعات
 async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -229,12 +229,17 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
                 await update.message.reply_text("❌ يرجى كتابة اسم الأغنية بعد كلمة `شغل`\nمثال: `شغل حسام الرسام`")
             return
         
-        elif text.startswith('ابحث '):
-            song_name = text.replace('ابحث ', '', 1).strip()
+        elif text.startswith('بحث ') or text.startswith('ابحث '):
+            # دعم كلاً من "بحث" و "ابحث"
+            if text.startswith('بحث '):
+                song_name = text.replace('بحث ', '', 1).strip()
+            else:
+                song_name = text.replace('ابحث ', '', 1).strip()
+                
             if song_name:
                 await update.message.reply_text(f"🔍 **جاري البحث عن:** {song_name}\n\n📋 سيتم عرض النتائج قريباً...")
             else:
-                await update.message.reply_text("❌ يرجى كتابة اسم الأغنية بعد كلمة `ابحث`\nمثال: `ابحث اغنية حزينة`")
+                await update.message.reply_text("❌ يرجى كتابة اسم الأغنية بعد كلمة `بحث`\nمثال: `بحث حسام الرسام`")
             return
         
         elif text.startswith('يوت '):
@@ -286,14 +291,19 @@ async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE
         else:
             await update.message.reply_text("❌ يرجى كتابة اسم الأغنية بعد كلمة `شغل`\nمثال: `شغل حسام الرسام`")
     
-    elif text.startswith('ابحث '):
+    elif text.startswith('بحث ') or text.startswith('ابحث '):
         await update_stats(user_id, "group")
         
-        song_name = text.replace('ابحث ', '', 1).strip()
+        # دعم كلاً من "بحث" و "ابحث"
+        if text.startswith('بحث '):
+            song_name = text.replace('بحث ', '', 1).strip()
+        else:
+            song_name = text.replace('ابحث ', '', 1).strip()
+            
         if song_name:
             await update.message.reply_text(f"🔍 **جاري البحث عن:** {song_name}\n\n📋 سيتم عرض النتائج قريباً...")
         else:
-            await update.message.reply_text("❌ يرجى كتابة اسم الأغنية بعد كلمة `ابحث`\nمثال: `ابحث اغنية حزينة`")
+            await update.message.reply_text("❌ يرجى كتابة اسم الأغنية بعد كلمة `بحث`\nمثال: `بحث حسام الرسام`")
     
     elif text.startswith('يوت '):
         await update_stats(user_id, "group")
@@ -328,7 +338,7 @@ async def group_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 🎶 **أوامر التشغيل:**
 `شغل + اسم الأغنية` - تشغيل مباشر
-`ابحث + اسم الأغنية` - بحث في اليوتيوب
+`بحث + اسم الأغنية` - بحث في اليوتيوب
 `يوت + اسم الأغنية` - تحميل كملف صوتي
 
 ⏯️ **أوامر التحكم:**
@@ -397,7 +407,7 @@ def main():
     print("🎵 Shams Music Bot يعمل بنجاح!")
     print(f"📢 القناة: @{CHANNEL_USERNAME}")
     print(f"👤 المطور: @{DEVELOPER_USERNAME}")
-    print("⚡ الأوامر الجاهزة: شغل، ابحث، يوت، قف، اكمل، تخطي، ايقاف")
+    print("⚡ الأوامر الجاهزة: شغل، بحث، يوت، قف، اكمل، تخطي، ايقاف")
     
     # ▶️ بدء البوت
     try:
