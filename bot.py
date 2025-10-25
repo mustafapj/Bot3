@@ -3,6 +3,8 @@
 import os
 import asyncio
 import yt_dlp
+# أضف هذا في الأعلى مع باقي الاستيرادات
+from telegram.ext import MessageHandler, filters
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, ContextTypes, CallbackQueryHandler
 
