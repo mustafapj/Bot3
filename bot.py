@@ -212,27 +212,56 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         await query.message.reply_text("🎵 **استخدم الأوامر التالية:**\n\n`شغل اسم الأغنية` - للتشغيل المباشر\n`ابحث اسم الأغنية` - للبحث\n`يوت اسم الأغنية` - للتحميل")
 
-# 🎵 أوامر التشغيل في المجموعات
-async def handle_play_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """معالجة أمر شغل"""
+# 🎵 معالجة الأوامر النصية في المجموعات
+async def handle_text_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالجة جميع الرسائل النصية"""
     user_id = update.effective_user.id
     username = update.effective_user.username
-    
-    # تحديث الإحصائيات
-    await update_stats(user_id, "group")
-    bot_stats["total_plays"] += 1
+    text = update.message.text.strip()
     
     # إذا كان المطور، امنحه الوصول مباشرة
     if await is_developer(user_id, username):
-        if not context.args:
-            await update.message.reply_text("❌ يرجى كتابة اسم الأغنية بعد كلمة `شغل`\nمثال: `شغل حسام الرسام`")
+        if text.startswith('شغل '):
+            song_name = text.replace('شغل ', '', 1).strip()
+            if song_name:
+                await update.message.reply_text(f"🎵 **جاري تشغيل:** {song_name}\n\n⚡ يتم التشغيل في المجموعة...")
+            else:
+                await update.message.reply_text("❌ يرجى كتابة اسم الأغنية بعد كلمة `شغل`\nمثال: `شغل حسام الرسام`")
             return
         
-        song_name = " ".join(context.args)
-        await update.message.reply_text(f"🎵 **جاري تشغيل:** {song_name}\n\n⚡ يتم التشغيل في المجموعة...")
-        return
+        elif text.startswith('ابحث '):
+            song_name = text.replace('ابحث ', '', 1).strip()
+            if song_name:
+                await update.message.reply_text(f"🔍 **جاري البحث عن:** {song_name}\n\n📋 سيتم عرض النتائج قريباً...")
+            else:
+                await update.message.reply_text("❌ يرجى كتابة اسم الأغنية بعد كلمة `ابحث`\nمثال: `ابحث اغنية حزينة`")
+            return
+        
+        elif text.startswith('يوت '):
+            song_name = text.replace('يوت ', '', 1).strip()
+            if song_name:
+                await update.message.reply_text(f"📥 **جاري تحميل:** {song_name}\n\n⏳ المدة: دقيقة واحدة\nسيتم إرسالها كملف صوتي...")
+            else:
+                await update.message.reply_text("❌ يرجى كتابة اسم الأغنية بعد كلمة `يوت`\nمثال: `يوت اغنية رومانسية`")
+            return
+        
+        elif text == 'قف':
+            await update.message.reply_text("⏸️ **تم إيقاف التشغيل مؤقتاً**\n\nاكتب `اكمل` لاستئناف التشغيل")
+            return
+        
+        elif text == 'اكمل':
+            await update.message.reply_text("▶️ **تم استئناف التشغيل**\n\nاكتب `قف` للإيقاف المؤقت")
+            return
+        
+        elif text == 'تخطي':
+            await update.message.reply_text("⏭️ **تم تخطي الأغنية**\n\nجاري تشغيل التالية...")
+            return
+        
+        elif text == 'ايقاف':
+            await update.message.reply_text("⏹️ **تم إيقاف التشغيل**\n\nاكتب `شغل` لتشغيل أغنية جديدة")
+            return
     
-    # التحقق من الاشتراك أولاً
+    # للمستخدمين العاديين - التحقق من الاشتراك أولاً
     if not await check_channel_subscription(user_id, context.bot):
         keyboard = [
             [InlineKeyboardButton("اضغط للاشتراك بالقناة", url=f"https://t.me/{CHANNEL_USERNAME}")],
@@ -245,161 +274,47 @@ async def handle_play_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         await update.message.reply_text(subscription_text, reply_markup=reply_markup, parse_mode='Markdown')
         return
     
-    if not context.args:
-        await update.message.reply_text("❌ يرجى كتابة اسم الأغنية بعد كلمة `شغل`\nمثال: `شغل حسام الرسام`")
-        return
+    # إذا كان المستخدم مشتركاً - معالجة الأوامر
+    if text.startswith('شغل '):
+        # تحديث الإحصائيات
+        await update_stats(user_id, "group")
+        bot_stats["total_plays"] += 1
+        
+        song_name = text.replace('شغل ', '', 1).strip()
+        if song_name:
+            await update.message.reply_text(f"🎵 **جاري تشغيل:** {song_name}\n\n⚡ يتم التشغيل في المجموعة...")
+        else:
+            await update.message.reply_text("❌ يرجى كتابة اسم الأغنية بعد كلمة `شغل`\nمثال: `شغل حسام الرسام`")
     
-    song_name = " ".join(context.args)
-    await update.message.reply_text(f"🎵 **جاري تشغيل:** {song_name}\n\n⚡ يتم التشغيل في المجموعة...")
-
-async def handle_search_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """معالجة أمر ابحث"""
-    user_id = update.effective_user.id
-    username = update.effective_user.username
-    
-    # تحديث الإحصائيات
-    await update_stats(user_id, "group")
-    
-    # إذا كان المطور، امنحه الوصول مباشرة
-    if await is_developer(user_id, username):
-        if not context.args:
+    elif text.startswith('ابحث '):
+        await update_stats(user_id, "group")
+        
+        song_name = text.replace('ابحث ', '', 1).strip()
+        if song_name:
+            await update.message.reply_text(f"🔍 **جاري البحث عن:** {song_name}\n\n📋 سيتم عرض النتائج قريباً...")
+        else:
             await update.message.reply_text("❌ يرجى كتابة اسم الأغنية بعد كلمة `ابحث`\nمثال: `ابحث اغنية حزينة`")
-            return
+    
+    elif text.startswith('يوت '):
+        await update_stats(user_id, "group")
         
-        song_name = " ".join(context.args)
-        await update.message.reply_text(f"🔍 **جاري البحث عن:** {song_name}\n\n📋 سيتم عرض النتائج قريباً...")
-        return
-    
-    # التحقق من الاشتراك أولاً
-    if not await check_channel_subscription(user_id, context.bot):
-        keyboard = [
-            [InlineKeyboardButton("اضغط للاشتراك بالقناة", url=f"https://t.me/{CHANNEL_USERNAME}")],
-            [InlineKeyboardButton("✅ تحقق من الاشتراك", callback_data="check_subscription")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        
-        await update.message.reply_text(
-            f"❌ **عذراً [{update.effective_user.first_name}](tg://user?id={user_id}) غير مشترك بقناة البوت**",
-            reply_markup=reply_markup,
-            parse_mode='Markdown'
-        )
-        return
-    
-    if not context.args:
-        await update.message.reply_text("❌ يرجى كتابة اسم الأغنية بعد كلمة `ابحث`\nمثال: `ابحث اغنية حزينة`")
-        return
-    
-    song_name = " ".join(context.args)
-    await update.message.reply_text(f"🔍 **جاري البحث عن:** {song_name}\n\n📋 سيتم عرض النتائج قريباً...")
-
-async def handle_youtube_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """معالجة أمر يوت"""
-    user_id = update.effective_user.id
-    username = update.effective_user.username
-    
-    # تحديث الإحصائيات
-    await update_stats(user_id, "group")
-    
-    # إذا كان المطور، امنحه الوصول مباشرة
-    if await is_developer(user_id, username):
-        if not context.args:
+        song_name = text.replace('يوت ', '', 1).strip()
+        if song_name:
+            await update.message.reply_text(f"📥 **جاري تحميل:** {song_name}\n\n⏳ المدة: دقيقة واحدة\nسيتم إرسالها كملف صوتي...")
+        else:
             await update.message.reply_text("❌ يرجى كتابة اسم الأغنية بعد كلمة `يوت`\nمثال: `يوت اغنية رومانسية`")
-            return
-        
-        song_name = " ".join(context.args)
-        await update.message.reply_text(f"📥 **جاري تحميل:** {song_name}\n\n⏳ المدة: دقيقة واحدة\nسيتم إرسالها كملف صوتي...")
-        return
     
-    # التحقق من الاشتراك أولاً
-    if not await check_channel_subscription(user_id, context.bot):
-        keyboard = [
-            [InlineKeyboardButton("اضغط للاشتراك بالقناة", url=f"https://t.me/{CHANNEL_USERNAME}")],
-            [InlineKeyboardButton("✅ تحقق من الاشتراك", callback_data="check_subscription")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        
-        await update.message.reply_text(
-            f"❌ **عذراً [{update.effective_user.first_name}](tg://user?id={user_id}) غير مشترك بقناة البوت**",
-            reply_markup=reply_markup,
-            parse_mode='Markdown'
-        )
-        return
-    
-    if not context.args:
-        await update.message.reply_text("❌ يرجى كتابة اسم الأغنية بعد كلمة `يوت`\nمثال: `يوت اغنية رومانسية`")
-        return
-    
-    song_name = " ".join(context.args)
-    await update.message.reply_text(f"📥 **جاري تحميل:** {song_name}\n\n⏳ المدة: دقيقة واحدة\nسيتم إرسالها كملف صوتي...")
-
-# 🎵 أوامر التحكم في التشغيل
-async def handle_pause_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """معالجة أمر قف"""
-    user_id = update.effective_user.id
-    username = update.effective_user.username
-    
-    # إذا كان المطور، امنحه الوصول مباشرة
-    if await is_developer(user_id, username):
+    elif text == 'قف':
         await update.message.reply_text("⏸️ **تم إيقاف التشغيل مؤقتاً**\n\nاكتب `اكمل` لاستئناف التشغيل")
-        return
     
-    # التحقق من الاشتراك أولاً
-    if not await check_channel_subscription(user_id, context.bot):
-        await update.message.reply_text(f"❌ **عذراً [{update.effective_user.first_name}](tg://user?id={user_id}) غير مشترك بقناة البوت**", parse_mode='Markdown')
-        return
-    
-    await update.message.reply_text("⏸️ **تم إيقاف التشغيل مؤقتاً**\n\nاكتب `اكمل` لاستئناف التشغيل")
-
-async def handle_resume_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """معالجة أمر اكمل"""
-    user_id = update.effective_user.id
-    username = update.effective_user.username
-    
-    # إذا كان المطور، امنحه الوصول مباشرة
-    if await is_developer(user_id, username):
+    elif text == 'اكمل':
         await update.message.reply_text("▶️ **تم استئناف التشغيل**\n\nاكتب `قف` للإيقاف المؤقت")
-        return
     
-    # التحقق من الاشتراك أولاً
-    if not await check_channel_subscription(user_id, context.bot):
-        await update.message.reply_text(f"❌ **عذراً [{update.effective_user.first_name}](tg://user?id={user_id}) غير مشترك بقناة البوت**", parse_mode='Markdown')
-        return
-    
-    await update.message.reply_text("▶️ **تم استئناف التشغيل**\n\nاكتب `قف` للإيقاف المؤقت")
-
-async def handle_skip_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """معالجة أمر تخطي"""
-    user_id = update.effective_user.id
-    username = update.effective_user.username
-    
-    # إذا كان المطور، امنحه الوصول مباشرة
-    if await is_developer(user_id, username):
+    elif text == 'تخطي':
         await update.message.reply_text("⏭️ **تم تخطي الأغنية**\n\nجاري تشغيل التالية...")
-        return
     
-    # التحقق من الاشتراك أولاً
-    if not await check_channel_subscription(user_id, context.bot):
-        await update.message.reply_text(f"❌ **عذراً [{update.effective_user.first_name}](tg://user?id={user_id}) غير مشترك بقناة البوت**", parse_mode='Markdown')
-        return
-    
-    await update.message.reply_text("⏭️ **تم تخطي الأغنية**\n\nجاري تشغيل التالية...")
-
-async def handle_stop_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """معالجة أمر ايقاف"""
-    user_id = update.effective_user.id
-    username = update.effective_user.username
-    
-    # إذا كان المطور، امنحه الوصول مباشرة
-    if await is_developer(user_id, username):
+    elif text == 'ايقاف':
         await update.message.reply_text("⏹️ **تم إيقاف التشغيل**\n\nاكتب `شغل` لتشغيل أغنية جديدة")
-        return
-    
-    # التحقق من الاشتراك أولاً
-    if not await check_channel_subscription(user_id, context.bot):
-        await update.message.reply_text(f"❌ **عذراً [{update.effective_user.first_name}](tg://user?id={user_id}) غير مشترك بقناة البوت**", parse_mode='Markdown')
-        return
-    
-    await update.message.reply_text("⏹️ **تم إيقاف التشغيل**\n\nاكتب `شغل` لتشغيل أغنية جديدة")
 
 async def group_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """رسالة ترحيبية عند إضافة البوت للمجموعة"""
@@ -467,14 +382,8 @@ def main():
     application.add_handler(CommandHandler("stats", stats_command))
     application.add_handler(CommandHandler("help", start))
     
-    # 🎵 معالجة الأوامر النصية في المجموعات
-    application.add_handler(MessageHandler(filters.Regex(r'^شغل\s+.+'), handle_play_command))
-    application.add_handler(MessageHandler(filters.Regex(r'^ابحث\s+.+'), handle_search_command))
-    application.add_handler(MessageHandler(filters.Regex(r'^يوت\s+.+'), handle_youtube_command))
-    application.add_handler(MessageHandler(filters.Regex(r'^قف$'), handle_pause_command))
-    application.add_handler(MessageHandler(filters.Regex(r'^اكمل$'), handle_resume_command))
-    application.add_handler(MessageHandler(filters.Regex(r'^تخطي$'), handle_skip_command))
-    application.add_handler(MessageHandler(filters.Regex(r'^ايقاف$'), handle_stop_command))
+    # 🎵 معالجة جميع الرسائل النصية
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_message))
     
     # 🔘 معالجة الأزرار
     application.add_handler(CallbackQueryHandler(handle_callback))
