@@ -51,10 +51,16 @@ playback_status = {}
 async def check_channel_subscription(user_id: int, bot) -> bool:
     """التحقق من اشتراك المستخدم في القناة"""
     try:
-        member = await bot.get_chat_member(f"@{CHANNEL_USERNAME}", user_id)
-        return member.status in ['member', 'administrator', 'creator']
+        # استخدام get_chat_member للتحقق من الاشتراك
+        chat_member = await bot.get_chat_member(f"@{CHANNEL_USERNAME}", user_id)
+        # إذا كان المستخدم عضو أو مشرف أو مالك
+        if chat_member.status in ['member', 'administrator', 'creator']:
+            return True
+        else:
+            return False
     except Exception as e:
-        logging.error(f"Error checking subscription: {e}")
+        # إذا كان هناك خطأ (مثل: المستخدم غير موجود في القناة)
+        logging.error(f"خطأ في التحقق من الاشتراك: {e}")
         return False
 
 async def is_developer(user_id: int, username: str) -> bool:
@@ -95,15 +101,36 @@ async def update_stats(user_id: int, chat_type: str):
     bot_stats["total_users"] = len(bot_stats["active_users"])
     
     if chat_type == "group" or chat_type == "supergroup":
-        bot_stats["group_count"] += 1
+        bot_stats["group_count"] = len(bot_stats["active_users"])  # تقدير عدد المجموعات
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """أمر البدء مع التحقق من الاشتراك"""
     user_id = update.effective_user.id
+    username = update.effective_user.username
     
     # تحديث الإحصائيات
     chat_type = update.effective_chat.type
     await update_stats(user_id, chat_type)
+    
+    # إذا كان المطور، امنحه الوصول مباشرة
+    if await is_developer(user_id, username):
+        welcome_text = """
+🎵 **مرحباً بك في بوت تشغيل الموسيقى!** 🎵
+
+⚡ **البوت يعمل بشكل ممتاز**
+        """
+        keyboard = [
+            [
+                InlineKeyboardButton("📥 أضفني لمجموعتك", url=f"https://t.me/{context.bot.username}?startgroup=true")
+            ],
+            [
+                InlineKeyboardButton("📢 قناة البوت", url=f"https://t.me/{CHANNEL_USERNAME}"),
+                InlineKeyboardButton("👤 التواصل مع المطور", url=f"https://t.me/{DEVELOPER_USERNAME}")
+            ]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await update.message.reply_text(welcome_text, reply_markup=reply_markup)
+        return
     
     # التحقق من الاشتراك في القناة
     if not await check_channel_subscription(user_id, context.bot):
@@ -160,8 +187,14 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     
     user_id = query.from_user.id
+    username = query.from_user.username
     
     if query.data == "check_subscription":
+        # إذا كان المطور، امنحه الوصول مباشرة
+        if await is_developer(user_id, username):
+            await query.message.reply_text("👑 أنت المطور! لا تحتاج للاشتراك.\n\nاكتب /start للبدء! 🎉")
+            return
+        
         if await check_channel_subscription(user_id, context.bot):
             await query.message.reply_text("✅ **تم التحقق بنجاح! شكراً لاشتراكك.**\n\nاكتب /start للبدء! 🎉")
         else:
@@ -171,11 +204,21 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_play_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالجة أمر شغل"""
     user_id = update.effective_user.id
-    chat_id = update.effective_chat.id
+    username = update.effective_user.username
     
     # تحديث الإحصائيات
     await update_stats(user_id, "group")
     bot_stats["total_plays"] += 1
+    
+    # إذا كان المطور، امنحه الوصول مباشرة
+    if await is_developer(user_id, username):
+        if not context.args:
+            await update.message.reply_text("❌ يرجى كتابة اسم الأغنية بعد كلمة `شغل`\nمثال: `شغل حسام الرسام`")
+            return
+        
+        song_name = " ".join(context.args)
+        await update.message.reply_text(f"🎵 **جاري تشغيل:** {song_name}\n\n⚡ يتم التشغيل في المجموعة...")
+        return
     
     # التحقق من الاشتراك أولاً
     if not await check_channel_subscription(user_id, context.bot):
@@ -213,10 +256,20 @@ async def handle_play_command(update: Update, context: ContextTypes.DEFAULT_TYPE
 async def handle_search_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالجة أمر ابحث"""
     user_id = update.effective_user.id
-    chat_id = update.effective_chat.id
+    username = update.effective_user.username
     
     # تحديث الإحصائيات
     await update_stats(user_id, "group")
+    
+    # إذا كان المطور، امنحه الوصول مباشرة
+    if await is_developer(user_id, username):
+        if not context.args:
+            await update.message.reply_text("❌ يرجى كتابة اسم الأغنية بعد كلمة `ابحث`\nمثال: `ابحث اغنية حزينة`")
+            return
+        
+        song_name = " ".join(context.args)
+        await update.message.reply_text(f"🔍 **جاري البحث عن:** {song_name}\n\n📋 سيتم عرض النتائج قريباً...")
+        return
     
     # التحقق من الاشتراك أولاً
     if not await check_channel_subscription(user_id, context.bot):
@@ -248,10 +301,20 @@ async def handle_search_command(update: Update, context: ContextTypes.DEFAULT_TY
 async def handle_youtube_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالجة أمر يوت"""
     user_id = update.effective_user.id
-    chat_id = update.effective_chat.id
+    username = update.effective_user.username
     
     # تحديث الإحصائيات
     await update_stats(user_id, "group")
+    
+    # إذا كان المطور، امنحه الوصول مباشرة
+    if await is_developer(user_id, username):
+        if not context.args:
+            await update.message.reply_text("❌ يرجى كتابة اسم الأغنية بعد كلمة `يوت`\nمثال: `يوت اغنية رومانسية`")
+            return
+        
+        song_name = " ".join(context.args)
+        await update.message.reply_text(f"📥 **جاري تحميل:** {song_name}\n\n⏳ المدة: دقيقة واحدة\nسيتم إرسالها كملف صوتي...")
+        return
     
     # التحقق من الاشتراك أولاً
     if not await check_channel_subscription(user_id, context.bot):
@@ -284,7 +347,12 @@ async def handle_youtube_command(update: Update, context: ContextTypes.DEFAULT_T
 async def handle_pause_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالجة أمر قف"""
     user_id = update.effective_user.id
-    chat_id = update.effective_chat.id
+    username = update.effective_user.username
+    
+    # إذا كان المطور، امنحه الوصول مباشرة
+    if await is_developer(user_id, username):
+        await update.message.reply_text("⏸️ **تم إيقاف التشغيل مؤقتاً**\n\nاكتب `اكمل` لاستئناف التشغيل")
+        return
     
     # التحقق من الاشتراك أولاً
     if not await check_channel_subscription(user_id, context.bot):
@@ -296,7 +364,12 @@ async def handle_pause_command(update: Update, context: ContextTypes.DEFAULT_TYP
 async def handle_resume_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالجة أمر اكمل"""
     user_id = update.effective_user.id
-    chat_id = update.effective_chat.id
+    username = update.effective_user.username
+    
+    # إذا كان المطور، امنحه الوصول مباشرة
+    if await is_developer(user_id, username):
+        await update.message.reply_text("▶️ **تم استئناف التشغيل**\n\nاكتب `قف` للإيقاف المؤقت")
+        return
     
     # التحقق من الاشتراك أولاً
     if not await check_channel_subscription(user_id, context.bot):
@@ -308,7 +381,12 @@ async def handle_resume_command(update: Update, context: ContextTypes.DEFAULT_TY
 async def handle_skip_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالجة أمر تخطي"""
     user_id = update.effective_user.id
-    chat_id = update.effective_chat.id
+    username = update.effective_user.username
+    
+    # إذا كان المطور، امنحه الوصول مباشرة
+    if await is_developer(user_id, username):
+        await update.message.reply_text("⏭️ **تم تخطي الأغنية**\n\nجاري تشغيل التالية...")
+        return
     
     # التحقق من الاشتراك أولاً
     if not await check_channel_subscription(user_id, context.bot):
@@ -320,7 +398,12 @@ async def handle_skip_command(update: Update, context: ContextTypes.DEFAULT_TYPE
 async def handle_stop_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالجة أمر ايقاف"""
     user_id = update.effective_user.id
-    chat_id = update.effective_chat.id
+    username = update.effective_user.username
+    
+    # إذا كان المطور، امنحه الوصول مباشرة
+    if await is_developer(user_id, username):
+        await update.message.reply_text("⏹️ **تم إيقاف التشغيل**\n\nاكتب `شغل` لتشغيل أغنية جديدة")
+        return
     
     # التحقق من الاشتراك أولاً
     if not await check_channel_subscription(user_id, context.bot):
