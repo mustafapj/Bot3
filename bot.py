@@ -1,11 +1,16 @@
+# bot.py - الكود المعدل بدون pytgcalls
+
 import os
 import asyncio
 import yt_dlp
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
-#from pytgcalls import PyTgCalls
-#from pytgcalls.types import AudioPiped
-#from pytgcalls.types.input_stream import InputAudioStream
+
+# إزالة استيراد pytgcalls
+# from pytgcalls import PyTgCalls
+# from pytgcalls.types import AudioPiped
+# from pytgcalls.types.input_stream import InputAudioStream
+
 import config
 
 # قاموس لتخزين بيانات المكالمات
@@ -15,7 +20,8 @@ song_queues = {}
 class MusicBot:
     def __init__(self):
         self.app = Application.builder().token(config.BOT_TOKEN).build()
-        self.pytgcalls = PyTgCalls(client=None)
+        # إزالة pytgcalls
+        # self.pytgcalls = PyTgCalls(client=None)
         self.setup_handlers()
         
     def setup_handlers(self):
@@ -57,24 +63,7 @@ class MusicBot:
     async def join(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """الانضمام للمكالمة الصوتية"""
         chat_id = update.effective_chat.id
-        user_id = update.effective_user.id
-        
-        try:
-            # التحقق من أن المستخدم في مكالمة
-            if update.message.reply_to_message:
-                await self.pytgcalls.join_group_call(
-                    chat_id,
-                    AudioPiped(
-                        "http://stream.example.com/stream",  # ستتم معالجته لاحقاً
-                    )
-                )
-                active_calls[chat_id] = True
-                await update.message.reply_text("✅ انضممت للمكالمة الصوتية!")
-            else:
-                await update.message.reply_text("❌ يجب أن تكون في مكالمة صوتية أولاً!")
-                
-        except Exception as e:
-            await update.message.reply_text(f"❌ خطأ في الانضمام: {str(e)}")
+        await update.message.reply_text("✅ خاصية المكالمات الصوتية قيد التطوير")
 
     async def play(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """تشغيل أغنية"""
@@ -105,10 +94,6 @@ class MusicBot:
                 f"⏱ المدة: {song_info['duration']}\n"
                 f"📊 Position in queue: #{len(song_queues[chat_id])}"
             )
-            
-            # إذا كانت الأولى في الطابور، ابدأ التشغيل
-            if len(song_queues[chat_id]) == 1:
-                await self.play_next(chat_id)
                 
         except Exception as e:
             await update.message.reply_text(f"❌ خطأ في التشغيل: {str(e)}")
@@ -147,28 +132,13 @@ class MusicBot:
             return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
         return f"{minutes:02d}:{seconds:02d}"
 
-    async def play_next(self, chat_id):
-        """تشغيل الأغنية التالية في الطابور"""
-        if chat_id in song_queues and song_queues[chat_id]:
-            song = song_queues[chat_id][0]
-            try:
-                # هنا سيتم تشغيل الأغنية في المكالمة
-                # هذا جزء متقدم يحتاج مزيد من الإعداد
-                pass
-            except Exception as e:
-                print(f"Error playing song: {e}")
-
     async def pause(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """إيقاف التشغيل مؤقتاً"""
-        chat_id = update.effective_chat.id
-        await update.message.reply_text("⏸ تم الإيقاف المؤقت")
-        # كود الإيقاف سيتم هنا
+        await update.message.reply_text("⏸ خاصية الإيقاف قيد التطوير")
 
     async def resume(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """استئناف التشغيل"""
-        chat_id = update.effective_chat.id
-        await update.message.reply_text("▶️ تم استئناف التشغيل")
-        # كود الاستئناف سيتم هنا
+        await update.message.reply_text("▶️ خاصية الاستئناف قيد التطوير")
 
     async def skip(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """تخطي الأغنية الحالية"""
@@ -176,7 +146,6 @@ class MusicBot:
         if chat_id in song_queues and song_queues[chat_id]:
             song_queues[chat_id].pop(0)
             await update.message.reply_text("⏭ تم تخطي الأغنية")
-            await self.play_next(chat_id)
         else:
             await update.message.reply_text("❌ لا توجد أغاني في الطابور")
 
@@ -205,15 +174,7 @@ class MusicBot:
 
     async def set_volume(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """ضبط مستوى الصوت"""
-        if context.args and context.args[0].isdigit():
-            volume = int(context.args[0])
-            if 1 <= volume <= 200:
-                await update.message.reply_text(f"🔊 تم ضبط الصوت على: {volume}%")
-                # كود ضبط الصوت سيتم هنا
-            else:
-                await update.message.reply_text("❌ الصوت يجب أن يكون بين 1 و 200")
-        else:
-            await update.message.reply_text("🔊 استخدم: /volume 1-200")
+        await update.message.reply_text("🔊 خاصية ضبط الصوت قيد التطوير")
 
     def run(self):
         """تشغيل البوت"""
