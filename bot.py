@@ -37,16 +37,16 @@ logging.basicConfig(
     level=logging.INFO
 )
 
+# 📊 إحصائيات البوت
+bot_stats = {
+    "total_users": 0,
+    "active_users": set(),
+    "group_count": 0,
+    "total_plays": 0
+}
+
 # 🎵 تخزين حالة التشغيل للمجموعات
 playback_status = {}
-
-# 🔍 إعدادات yt-dlp
-ydl_opts = {
-    'format': 'bestaudio/best',
-    'outtmpl': 'downloads/%(title)s.%(ext)s',
-    'quiet': True,
-    'no_warnings': True,
-}
 
 async def check_channel_subscription(user_id: int, bot) -> bool:
     """التحقق من اشتراك المستخدم في القناة"""
@@ -65,22 +65,21 @@ async def is_developer(user_id: int, username: str) -> bool:
         return False
 
 async def send_subscription_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """إرسال رسالة طلب الاشتراك في القناة"""
+    """إرسال رسالة طلب الاشتراك في القناة بشكل عام"""
     keyboard = [
         [
             InlineKeyboardButton("📢 قناة البوت", url=f"https://t.me/{CHANNEL_USERNAME}"),
-            InlineKeyboardButton("👤 المطور", url=f"https://t.me/{DEVELOPER_USERNAME}")
-        ],
-        [
             InlineKeyboardButton("✅ تحقق من الاشتراك", callback_data="check_subscription")
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    subscription_text = """
-🎵 **مرحباً بك في بوت تشغيل الموسيقى!** 🎵
+    subscription_text = f"""
+🔒 **عذراً عزيزي!** 🔒
 
 📢 **للاستفادة من ميزات البوت، يجب الاشتراك في قناتنا الرسمية أولاً**
+
+@{CHANNEL_USERNAME}
 
 ⚡ **خطوات الاشتراك:**
 1️⃣ انضم إلى القناة بالضغط على الزر أدناه
@@ -88,86 +87,23 @@ async def send_subscription_message(update: Update, context: ContextTypes.DEFAUL
 3️⃣ استمتع بكامل ميزات البوت! 🎉
     """
     
-    # إرسال صورة ترحيبية إذا كانت موجودة
-    try:
-        if os.path.exists("welcome.jpg"):
-            await update.message.reply_photo(
-                photo=open("welcome.jpg", "rb"),
-                caption=subscription_text,
-                reply_markup=reply_markup
-            )
-        else:
-            await update.message.reply_text(subscription_text, reply_markup=reply_markup)
-    except:
-        await update.message.reply_text(subscription_text, reply_markup=reply_markup)
+    await update.message.reply_text(subscription_text, reply_markup=reply_markup)
 
-async def send_private_subscription_message(user_id: int, bot):
-    """إرسال رسالة طلب الاشتراك للعضو خاص"""
-    keyboard = [
-        [
-            InlineKeyboardButton("📢 قناة البوت", url=f"https://t.me/{CHANNEL_USERNAME}"),
-            InlineKeyboardButton("👤 المطور", url=f"https://t.me/{DEVELOPER_USERNAME}")
-        ],
-        [
-            InlineKeyboardButton("✅ تحقق من الاشتراك", callback_data="check_subscription")
-        ]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
+async def update_stats(user_id: int, chat_type: str):
+    """تحديث إحصائيات البوت"""
+    bot_stats["active_users"].add(user_id)
+    bot_stats["total_users"] = len(bot_stats["active_users"])
     
-    subscription_text = """
-🔒 **عذراً عزيزي!** 🔒
-
-📢 **للاستفادة من ميزات البوت في المجموعة، يجب الاشتراك في قناتنا الرسمية أولاً**
-
-⚡ **خطوات الاشتراك:**
-1️⃣ انضم إلى القناة بالضغط على الزر أدناه
-2️⃣ اضغط على زر "تحقق من الاشتراك"
-3️⃣ يمكنك استخدام البوت في المجموعة! 🎉
-    """
-    
-    try:
-        await bot.send_message(
-            chat_id=user_id,
-            text=subscription_text,
-            reply_markup=reply_markup
-        )
-    except Exception as e:
-        logging.error(f"Failed to send private message: {e}")
-
-async def check_member_subscription(user_id: int, chat_id: int, bot, update: Update = None):
-    """التحقق من اشتراك العضو في القناة وإرسال رسالة إذا لم يكن مشترك"""
-    if await is_developer(user_id, ""):
-        return True
-    
-    if await check_channel_subscription(user_id, bot):
-        return True
-    else:
-        # إرسال رسالة طلب الاشتراك للعضو خاص
-        await send_private_subscription_message(user_id, bot)
-        
-        # إرسال رسالة في المجموعة لإعلامه
-        if update and update.message:
-            await update.message.reply_text(
-                f"👋 [{update.effective_user.first_name}](tg://user?id={user_id})\n"
-                "📢 تم إرسال رسالة لك خاص، يرجى متابعتها لإكمال التحقق",
-                parse_mode='Markdown'
-            )
-        return False
+    if chat_type == "group" or chat_type == "supergroup":
+        bot_stats["group_count"] += 1
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """أمر البدء مع التحقق من الاشتراك"""
     user_id = update.effective_user.id
-    username = update.effective_user.username
     
-    # التحقق إذا كان المستخدم هو المطور
-    if await is_developer(user_id, username):
-        welcome_text = """
-👑 **مرحباً سيادة المطور!** 👑
-
-⚡ **البوت يعمل بشكل ممتاز**
-        """
-        await update.message.reply_text(welcome_text)
-        return
+    # تحديث الإحصائيات
+    chat_type = update.effective_chat.type
+    await update_stats(user_id, chat_type)
     
     # التحقق من الاشتراك في القناة
     if not await check_channel_subscription(user_id, context.bot):
@@ -196,19 +132,36 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await update.message.reply_text(welcome_text, reply_markup=reply_markup)
 
+async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """أمر الإحصائيات للمطور فقط"""
+    user_id = update.effective_user.id
+    username = update.effective_user.username
+    
+    if not await is_developer(user_id, username):
+        await update.message.reply_text("❌ هذا الأمر للمطور فقط")
+        return
+    
+    stats_text = f"""
+📊 **إحصائيات البوت**
+
+👥 **إجمالي المستخدمين:** {bot_stats['total_users']}
+🎯 **المستخدمين النشطين:** {len(bot_stats['active_users'])}
+📢 **عدد المجموعات:** {bot_stats['group_count']}
+🎵 **مرات التشغيل:** {bot_stats['total_plays']}
+
+⚡ **البوت يعمل بشكل ممتاز**
+    """
+    
+    await update.message.reply_text(stats_text)
+
 async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """معالجة الأزرار"""
     query = update.callback_query
     await query.answer()
     
     user_id = query.from_user.id
-    username = query.from_user.username
     
     if query.data == "check_subscription":
-        if await is_developer(user_id, username):
-            await query.message.reply_text("👑 أنت المطور! لا تحتاج للاشتراك.")
-            return
-        
         if await check_channel_subscription(user_id, context.bot):
             await query.message.reply_text("✅ **تم التحقق بنجاح! شكراً لاشتراكك.**\n\nاكتب /start للبدء! 🎉")
         else:
@@ -220,8 +173,32 @@ async def handle_play_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     user_id = update.effective_user.id
     chat_id = update.effective_chat.id
     
+    # تحديث الإحصائيات
+    await update_stats(user_id, "group")
+    bot_stats["total_plays"] += 1
+    
     # التحقق من الاشتراك أولاً
-    if not await check_member_subscription(user_id, chat_id, context.bot, update):
+    if not await check_channel_subscription(user_id, context.bot):
+        # إرسال رسالة طلب الاشتراك في المجموعة مباشرة
+        keyboard = [
+            [
+                InlineKeyboardButton("📢 قناة البوت", url=f"https://t.me/{CHANNEL_USERNAME}"),
+                InlineKeyboardButton("✅ تحقق من الاشتراك", callback_data="check_subscription")
+            ]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        subscription_text = f"""
+🔒 **عذراً [{update.effective_user.first_name}](tg://user?id={user_id})!** 🔒
+
+📢 **للاستفادة من ميزات البوت، يجب الاشتراك في قناتنا الرسمية أولاً**
+
+@{CHANNEL_USERNAME}
+
+⚡ **بعد الاشتراك، اضغط على زر التحقق**
+        """
+        
+        await update.message.reply_text(subscription_text, reply_markup=reply_markup, parse_mode='Markdown')
         return
     
     if not context.args:
@@ -238,8 +215,25 @@ async def handle_search_command(update: Update, context: ContextTypes.DEFAULT_TY
     user_id = update.effective_user.id
     chat_id = update.effective_chat.id
     
+    # تحديث الإحصائيات
+    await update_stats(user_id, "group")
+    
     # التحقق من الاشتراك أولاً
-    if not await check_member_subscription(user_id, chat_id, context.bot, update):
+    if not await check_channel_subscription(user_id, context.bot):
+        # إرسال رسالة طلب الاشتراك في المجموعة مباشرة
+        keyboard = [
+            [
+                InlineKeyboardButton("📢 قناة البوت", url=f"https://t.me/{CHANNEL_USERNAME}"),
+                InlineKeyboardButton("✅ تحقق من الاشتراك", callback_data="check_subscription")
+            ]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await update.message.reply_text(
+            f"🔒 **عذراً [{update.effective_user.first_name}](tg://user?id={user_id})! يجب الاشتراك في @{CHANNEL_USERNAME} أولاً**",
+            reply_markup=reply_markup,
+            parse_mode='Markdown'
+        )
         return
     
     if not context.args:
@@ -256,8 +250,25 @@ async def handle_youtube_command(update: Update, context: ContextTypes.DEFAULT_T
     user_id = update.effective_user.id
     chat_id = update.effective_chat.id
     
+    # تحديث الإحصائيات
+    await update_stats(user_id, "group")
+    
     # التحقق من الاشتراك أولاً
-    if not await check_member_subscription(user_id, chat_id, context.bot, update):
+    if not await check_channel_subscription(user_id, context.bot):
+        # إرسال رسالة طلب الاشتراك في المجموعة مباشرة
+        keyboard = [
+            [
+                InlineKeyboardButton("📢 قناة البوت", url=f"https://t.me/{CHANNEL_USERNAME}"),
+                InlineKeyboardButton("✅ تحقق من الاشتراك", callback_data="check_subscription")
+            ]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        await update.message.reply_text(
+            f"🔒 **عذراً [{update.effective_user.first_name}](tg://user?id={user_id})! يجب الاشتراك في @{CHANNEL_USERNAME} أولاً**",
+            reply_markup=reply_markup,
+            parse_mode='Markdown'
+        )
         return
     
     if not context.args:
@@ -276,7 +287,8 @@ async def handle_pause_command(update: Update, context: ContextTypes.DEFAULT_TYP
     chat_id = update.effective_chat.id
     
     # التحقق من الاشتراك أولاً
-    if not await check_member_subscription(user_id, chat_id, context.bot, update):
+    if not await check_channel_subscription(user_id, context.bot):
+        await update.message.reply_text(f"🔒 **عذراً [{update.effective_user.first_name}](tg://user?id={user_id})! يجب الاشتراك في @{CHANNEL_USERNAME} أولاً**", parse_mode='Markdown')
         return
     
     await update.message.reply_text("⏸️ **تم إيقاف التشغيل مؤقتاً**\n\nاكتب `اكمل` لاستئناف التشغيل")
@@ -287,7 +299,8 @@ async def handle_resume_command(update: Update, context: ContextTypes.DEFAULT_TY
     chat_id = update.effective_chat.id
     
     # التحقق من الاشتراك أولاً
-    if not await check_member_subscription(user_id, chat_id, context.bot, update):
+    if not await check_channel_subscription(user_id, context.bot):
+        await update.message.reply_text(f"🔒 **عذراً [{update.effective_user.first_name}](tg://user?id={user_id})! يجب الاشتراك في @{CHANNEL_USERNAME} أولاً**", parse_mode='Markdown')
         return
     
     await update.message.reply_text("▶️ **تم استئناف التشغيل**\n\nاكتب `قف` للإيقاف المؤقت")
@@ -298,7 +311,8 @@ async def handle_skip_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     chat_id = update.effective_chat.id
     
     # التحقق من الاشتراك أولاً
-    if not await check_member_subscription(user_id, chat_id, context.bot, update):
+    if not await check_channel_subscription(user_id, context.bot):
+        await update.message.reply_text(f"🔒 **عذراً [{update.effective_user.first_name}](tg://user?id={user_id})! يجب الاشتراك في @{CHANNEL_USERNAME} أولاً**", parse_mode='Markdown')
         return
     
     await update.message.reply_text("⏭️ **تم تخطي الأغنية**\n\nجاري تشغيل التالية...")
@@ -309,14 +323,15 @@ async def handle_stop_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     chat_id = update.effective_chat.id
     
     # التحقق من الاشتراك أولاً
-    if not await check_member_subscription(user_id, chat_id, context.bot, update):
+    if not await check_channel_subscription(user_id, context.bot):
+        await update.message.reply_text(f"🔒 **عذراً [{update.effective_user.first_name}](tg://user?id={user_id})! يجب الاشتراك في @{CHANNEL_USERNAME} أولاً**", parse_mode='Markdown')
         return
     
     await update.message.reply_text("⏹️ **تم إيقاف التشغيل**\n\nاكتب `شغل` لتشغيل أغنية جديدة")
 
 async def group_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """رسالة ترحيبية عند إضافة البوت للمجموعة"""
-    welcome_text = """
+    welcome_text = f"""
 🎵 **مرحباً بك في بوت تشغيل الموسيقى!** 🎵
 
 ⚡ **شكراً لإضافتي إلى مجموعتك**
@@ -332,13 +347,12 @@ async def group_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 `تخطي` - التالية
 `ايقاف` - إيقاف كامل
 
-📢 **مهم:** يجب على جميع الأعضاء الاشتراك في @MASTFA_20022
+📢 **مهم:** يجب على جميع الأعضاء الاشتراك في @{CHANNEL_USERNAME}
     """
     
     keyboard = [
         [
-            InlineKeyboardButton("📢 قناة البوت", url=f"https://t.me/{CHANNEL_USERNAME}"),
-            InlineKeyboardButton("👤 المطور", url=f"https://t.me/{DEVELOPER_USERNAME}")
+            InlineKeyboardButton("📢 قناة البوت", url=f"https://t.me/{CHANNEL_USERNAME}")
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -349,6 +363,7 @@ async def set_bot_commands(application):
     """تعيين أوامر البوت في القائمة"""
     commands = [
         BotCommand("start", "بدء استخدام البوت 🚀"),
+        BotCommand("stats", "إحصائيات البوت 📊"),
         BotCommand("play", "تشغيل الموسيقى 🎵"),
         BotCommand("stop", "إيقاف التشغيل ⏹️"),
         BotCommand("help", "المساعدة والدعم 🆘"),
@@ -376,6 +391,7 @@ def main():
     
     # ➕ إضافة المعالجات للأوامر
     application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("stats", stats_command))
     application.add_handler(CommandHandler("help", start))
     
     # 🎵 معالجة الأوامر النصية في المجموعات
@@ -400,6 +416,7 @@ def main():
     print(f"📢 القناة: @{CHANNEL_USERNAME}")
     print(f"👤 المطور: @{DEVELOPER_USERNAME}")
     print("⚡ الأوامر الجاهزة: شغل، ابحث، يوت، قف، اكمل، تخطي، ايقاف")
+    print("📊 أمر الإحصائيات: /stats (للمطور فقط)")
     
     # ▶️ بدء البوت
     try:
