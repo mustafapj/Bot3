@@ -45,21 +45,15 @@ bot_stats = {
     "total_plays": 0
 }
 
-# 🎵 تخزين حالة التشغيل للمجموعات
-playback_status = {}
-
 async def check_channel_subscription(user_id: int, bot) -> bool:
     """التحقق من اشتراك المستخدم في القناة"""
     try:
-        # استخدام get_chat_member للتحقق من الاشتراك
         chat_member = await bot.get_chat_member(f"@{CHANNEL_USERNAME}", user_id)
-        # إذا كان المستخدم عضو أو مشرف أو مالك
         if chat_member.status in ['member', 'administrator', 'creator']:
             return True
         else:
             return False
     except Exception as e:
-        # إذا كان هناك خطأ (مثل: المستخدم غير موجود في القناة)
         logging.error(f"خطأ في التحقق من الاشتراك: {e}")
         return False
 
@@ -71,26 +65,17 @@ async def is_developer(user_id: int, username: str) -> bool:
         return False
 
 async def send_subscription_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """إرسال رسالة طلب الاشتراك في القناة بشكل عام"""
+    """إرسال رسالة طلب الاشتراك في القناة"""
     keyboard = [
-        [
-            InlineKeyboardButton("📢 قناة البوت", url=f"https://t.me/{CHANNEL_USERNAME}"),
-            InlineKeyboardButton("✅ تحقق من الاشتراك", callback_data="check_subscription")
-        ]
+        [InlineKeyboardButton("اضغط للاشتراك بالقناة", url=f"https://t.me/{CHANNEL_USERNAME}")],
+        [InlineKeyboardButton("✅ تحقق من الاشتراك", callback_data="check_subscription")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     subscription_text = f"""
-🔒 **عذراً عزيزي!** 🔒
+❌ **عذراً عمري أن نسأت غير مشترك بقناة البوت**
 
-📢 **للاستفادة من ميزات البوت، يجب الاشتراك في قناتنا الرسمية أولاً**
-
-@{CHANNEL_USERNAME}
-
-⚡ **خطوات الاشتراك:**
-1️⃣ انضم إلى القناة بالضغط على الزر أدناه
-2️⃣ اضغط على زر "تحقق من الاشتراك"
-3️⃣ استمتع بكامل ميزات البوت! 🎉
+⚡ **للاستفادة من ميزات البوت، يجب الاشتراك في قناتنا الرسمية أولاً**
     """
     
     await update.message.reply_text(subscription_text, reply_markup=reply_markup)
@@ -101,7 +86,7 @@ async def update_stats(user_id: int, chat_type: str):
     bot_stats["total_users"] = len(bot_stats["active_users"])
     
     if chat_type == "group" or chat_type == "supergroup":
-        bot_stats["group_count"] = len(bot_stats["active_users"])  # تقدير عدد المجموعات
+        bot_stats["group_count"] = len(bot_stats["active_users"])
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """أمر البدء مع التحقق من الاشتراك"""
@@ -114,19 +99,28 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     # إذا كان المطور، امنحه الوصول مباشرة
     if await is_developer(user_id, username):
-        welcome_text = """
-🎵 **مرحباً بك في بوت تشغيل الموسيقى!** 🎵
+        welcome_text = f"""
+🎵 **Shams Music**  
+**بوت**  
 
-⚡ **البوت يعمل بشكل ممتاز**
+---
+
+⚡ **ماذا يمكن لهذا البوت فعله؟**  
+• * بوت تشغيل الموسيقى في الكروبات *  
+• * تشغيل الأغاني من اليوتيوب *  
+• * تحميل المقاطع الصوتية *  
+• * البحث عن الموسيقى *  
+
+🎶 **أرفع آدمن وارسل تفعيل**  
+
+---
+
+👤 **المطور:** @{DEVELOPER_USERNAME}
         """
         keyboard = [
-            [
-                InlineKeyboardButton("📥 أضفني لمجموعتك", url=f"https://t.me/{context.bot.username}?startgroup=true")
-            ],
-            [
-                InlineKeyboardButton("📢 قناة البوت", url=f"https://t.me/{CHANNEL_USERNAME}"),
-                InlineKeyboardButton("👤 التواصل مع المطور", url=f"https://t.me/{DEVELOPER_USERNAME}")
-            ]
+            [InlineKeyboardButton("📥 أضفني لمجموعتك", url=f"https://t.me/{context.bot.username}?startgroup=true")],
+            [InlineKeyboardButton("👤 مطور البوت", url=f"https://t.me/{DEVELOPER_USERNAME}")],
+            [InlineKeyboardButton("📢 قناة البوت", url=f"https://t.me/{CHANNEL_USERNAME}")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await update.message.reply_text(welcome_text, reply_markup=reply_markup)
@@ -138,22 +132,34 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     # إذا كان مشتركاً - عرض القائمة الرئيسية
-    welcome_text = """
-🎵 **مرحباً بك في بوت تشغيل الموسيقى!** 🎵
+    welcome_text = f"""
+🎵 **Shams Music**  
+**بوت**  
 
-✨ **شكراً لاشتراكك في قناتنا الرسمية**
+---
 
-⚡ **الآن يمكنك استخدام كامل ميزات البوت**
+⚡ **إهلا بك حبيبي العضو.**  
+
+✨ **ماذا يمكن لهذا البوت فعله؟**  
+• * بوت تشغيل الموسيقى في الكروبات *  
+• * تشغيل الأغاني من اليوتيوب *  
+• * تحميل المقاطع الصوتية *  
+• * البحث عن الموسيقى *  
+
+🎶 **أرفع آدمن وارسل تفعيل**  
+
+---
+
+👤 **المطور:** @{DEVELOPER_USERNAME}
     """
     
     keyboard = [
+        [InlineKeyboardButton("📥 أضفني لمجموعتك", url=f"https://t.me/{context.bot.username}?startgroup=true")],
         [
-            InlineKeyboardButton("📥 أضفني لمجموعتك", url=f"https://t.me/{context.bot.username}?startgroup=true")
+            InlineKeyboardButton("👤 مطور البوت", url=f"https://t.me/{DEVELOPER_USERNAME}"),
+            InlineKeyboardButton("📢 قناة البوت", url=f"https://t.me/{CHANNEL_USERNAME}")
         ],
-        [
-            InlineKeyboardButton("📢 قناة البوت", url=f"https://t.me/{CHANNEL_USERNAME}"),
-            InlineKeyboardButton("👤 التواصل مع المطور", url=f"https://t.me/{DEVELOPER_USERNAME}")
-        ]
+        [InlineKeyboardButton("🎵 تشغيل الموسيقى", callback_data="play_music")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
@@ -190,7 +196,6 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     username = query.from_user.username
     
     if query.data == "check_subscription":
-        # إذا كان المطور، امنحه الوصول مباشرة
         if await is_developer(user_id, username):
             await query.message.reply_text("👑 أنت المطور! لا تحتاج للاشتراك.\n\nاكتب /start للبدء! 🎉")
             return
@@ -199,6 +204,13 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.message.reply_text("✅ **تم التحقق بنجاح! شكراً لاشتراكك.**\n\nاكتب /start للبدء! 🎉")
         else:
             await query.message.reply_text("❌ **لم يتم العثور على اشتراكك.**\n\nيرجى الانضمام للقناة أولاً ثم اضغط على زر التحقق مرة أخرى.")
+    
+    elif query.data == "play_music":
+        if not await is_developer(user_id, username) and not await check_channel_subscription(user_id, context.bot):
+            await send_subscription_message(update, context)
+            return
+        
+        await query.message.reply_text("🎵 **استخدم الأوامر التالية:**\n\n`شغل اسم الأغنية` - للتشغيل المباشر\n`ابحث اسم الأغنية` - للبحث\n`يوت اسم الأغنية` - للتحميل")
 
 # 🎵 أوامر التشغيل في المجموعات
 async def handle_play_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -222,24 +234,13 @@ async def handle_play_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     
     # التحقق من الاشتراك أولاً
     if not await check_channel_subscription(user_id, context.bot):
-        # إرسال رسالة طلب الاشتراك في المجموعة مباشرة
         keyboard = [
-            [
-                InlineKeyboardButton("📢 قناة البوت", url=f"https://t.me/{CHANNEL_USERNAME}"),
-                InlineKeyboardButton("✅ تحقق من الاشتراك", callback_data="check_subscription")
-            ]
+            [InlineKeyboardButton("اضغط للاشتراك بالقناة", url=f"https://t.me/{CHANNEL_USERNAME}")],
+            [InlineKeyboardButton("✅ تحقق من الاشتراك", callback_data="check_subscription")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
-        subscription_text = f"""
-🔒 **عذراً [{update.effective_user.first_name}](tg://user?id={user_id})!** 🔒
-
-📢 **للاستفادة من ميزات البوت، يجب الاشتراك في قناتنا الرسمية أولاً**
-
-@{CHANNEL_USERNAME}
-
-⚡ **بعد الاشتراك، اضغط على زر التحقق**
-        """
+        subscription_text = f"❌ **عذراً [{update.effective_user.first_name}](tg://user?id={user_id}) غير مشترك بقناة البوت**"
         
         await update.message.reply_text(subscription_text, reply_markup=reply_markup, parse_mode='Markdown')
         return
@@ -249,8 +250,6 @@ async def handle_play_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         return
     
     song_name = " ".join(context.args)
-    
-    # محاكاة عملية التشغيل
     await update.message.reply_text(f"🎵 **جاري تشغيل:** {song_name}\n\n⚡ يتم التشغيل في المجموعة...")
 
 async def handle_search_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -273,17 +272,14 @@ async def handle_search_command(update: Update, context: ContextTypes.DEFAULT_TY
     
     # التحقق من الاشتراك أولاً
     if not await check_channel_subscription(user_id, context.bot):
-        # إرسال رسالة طلب الاشتراك في المجموعة مباشرة
         keyboard = [
-            [
-                InlineKeyboardButton("📢 قناة البوت", url=f"https://t.me/{CHANNEL_USERNAME}"),
-                InlineKeyboardButton("✅ تحقق من الاشتراك", callback_data="check_subscription")
-            ]
+            [InlineKeyboardButton("اضغط للاشتراك بالقناة", url=f"https://t.me/{CHANNEL_USERNAME}")],
+            [InlineKeyboardButton("✅ تحقق من الاشتراك", callback_data="check_subscription")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         await update.message.reply_text(
-            f"🔒 **عذراً [{update.effective_user.first_name}](tg://user?id={user_id})! يجب الاشتراك في @{CHANNEL_USERNAME} أولاً**",
+            f"❌ **عذراً [{update.effective_user.first_name}](tg://user?id={user_id}) غير مشترك بقناة البوت**",
             reply_markup=reply_markup,
             parse_mode='Markdown'
         )
@@ -294,8 +290,6 @@ async def handle_search_command(update: Update, context: ContextTypes.DEFAULT_TY
         return
     
     song_name = " ".join(context.args)
-    
-    # محاكاة عملية البحث
     await update.message.reply_text(f"🔍 **جاري البحث عن:** {song_name}\n\n📋 سيتم عرض النتائج قريباً...")
 
 async def handle_youtube_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -318,17 +312,14 @@ async def handle_youtube_command(update: Update, context: ContextTypes.DEFAULT_T
     
     # التحقق من الاشتراك أولاً
     if not await check_channel_subscription(user_id, context.bot):
-        # إرسال رسالة طلب الاشتراك في المجموعة مباشرة
         keyboard = [
-            [
-                InlineKeyboardButton("📢 قناة البوت", url=f"https://t.me/{CHANNEL_USERNAME}"),
-                InlineKeyboardButton("✅ تحقق من الاشتراك", callback_data="check_subscription")
-            ]
+            [InlineKeyboardButton("اضغط للاشتراك بالقناة", url=f"https://t.me/{CHANNEL_USERNAME}")],
+            [InlineKeyboardButton("✅ تحقق من الاشتراك", callback_data="check_subscription")]
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         await update.message.reply_text(
-            f"🔒 **عذراً [{update.effective_user.first_name}](tg://user?id={user_id})! يجب الاشتراك في @{CHANNEL_USERNAME} أولاً**",
+            f"❌ **عذراً [{update.effective_user.first_name}](tg://user?id={user_id}) غير مشترك بقناة البوت**",
             reply_markup=reply_markup,
             parse_mode='Markdown'
         )
@@ -339,8 +330,6 @@ async def handle_youtube_command(update: Update, context: ContextTypes.DEFAULT_T
         return
     
     song_name = " ".join(context.args)
-    
-    # محاكاة عملية التحميل
     await update.message.reply_text(f"📥 **جاري تحميل:** {song_name}\n\n⏳ المدة: دقيقة واحدة\nسيتم إرسالها كملف صوتي...")
 
 # 🎵 أوامر التحكم في التشغيل
@@ -356,7 +345,7 @@ async def handle_pause_command(update: Update, context: ContextTypes.DEFAULT_TYP
     
     # التحقق من الاشتراك أولاً
     if not await check_channel_subscription(user_id, context.bot):
-        await update.message.reply_text(f"🔒 **عذراً [{update.effective_user.first_name}](tg://user?id={user_id})! يجب الاشتراك في @{CHANNEL_USERNAME} أولاً**", parse_mode='Markdown')
+        await update.message.reply_text(f"❌ **عذراً [{update.effective_user.first_name}](tg://user?id={user_id}) غير مشترك بقناة البوت**", parse_mode='Markdown')
         return
     
     await update.message.reply_text("⏸️ **تم إيقاف التشغيل مؤقتاً**\n\nاكتب `اكمل` لاستئناف التشغيل")
@@ -373,7 +362,7 @@ async def handle_resume_command(update: Update, context: ContextTypes.DEFAULT_TY
     
     # التحقق من الاشتراك أولاً
     if not await check_channel_subscription(user_id, context.bot):
-        await update.message.reply_text(f"🔒 **عذراً [{update.effective_user.first_name}](tg://user?id={user_id})! يجب الاشتراك في @{CHANNEL_USERNAME} أولاً**", parse_mode='Markdown')
+        await update.message.reply_text(f"❌ **عذراً [{update.effective_user.first_name}](tg://user?id={user_id}) غير مشترك بقناة البوت**", parse_mode='Markdown')
         return
     
     await update.message.reply_text("▶️ **تم استئناف التشغيل**\n\nاكتب `قف` للإيقاف المؤقت")
@@ -390,7 +379,7 @@ async def handle_skip_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     
     # التحقق من الاشتراك أولاً
     if not await check_channel_subscription(user_id, context.bot):
-        await update.message.reply_text(f"🔒 **عذراً [{update.effective_user.first_name}](tg://user?id={user_id})! يجب الاشتراك في @{CHANNEL_USERNAME} أولاً**", parse_mode='Markdown')
+        await update.message.reply_text(f"❌ **عذراً [{update.effective_user.first_name}](tg://user?id={user_id}) غير مشترك بقناة البوت**", parse_mode='Markdown')
         return
     
     await update.message.reply_text("⏭️ **تم تخطي الأغنية**\n\nجاري تشغيل التالية...")
@@ -407,7 +396,7 @@ async def handle_stop_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     
     # التحقق من الاشتراك أولاً
     if not await check_channel_subscription(user_id, context.bot):
-        await update.message.reply_text(f"🔒 **عذراً [{update.effective_user.first_name}](tg://user?id={user_id})! يجب الاشتراك في @{CHANNEL_USERNAME} أولاً**", parse_mode='Markdown')
+        await update.message.reply_text(f"❌ **عذراً [{update.effective_user.first_name}](tg://user?id={user_id}) غير مشترك بقناة البوت**", parse_mode='Markdown')
         return
     
     await update.message.reply_text("⏹️ **تم إيقاف التشغيل**\n\nاكتب `شغل` لتشغيل أغنية جديدة")
@@ -415,7 +404,10 @@ async def handle_stop_command(update: Update, context: ContextTypes.DEFAULT_TYPE
 async def group_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """رسالة ترحيبية عند إضافة البوت للمجموعة"""
     welcome_text = f"""
-🎵 **مرحباً بك في بوت تشغيل الموسيقى!** 🎵
+🎵 **Shams Music**  
+**بوت**  
+
+---
 
 ⚡ **شكراً لإضافتي إلى مجموعتك**
 
@@ -434,9 +426,7 @@ async def group_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """
     
     keyboard = [
-        [
-            InlineKeyboardButton("📢 قناة البوت", url=f"https://t.me/{CHANNEL_USERNAME}")
-        ]
+        [InlineKeyboardButton("📢 قناة البوت", url=f"https://t.me/{CHANNEL_USERNAME}")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
@@ -495,11 +485,10 @@ def main():
     # 📝 تعيين أوامر القائمة
     application.post_init = set_bot_commands
     
-    print("🎵 بوت الموسيقى يعمل بنجاح!")
+    print("🎵 Shams Music Bot يعمل بنجاح!")
     print(f"📢 القناة: @{CHANNEL_USERNAME}")
     print(f"👤 المطور: @{DEVELOPER_USERNAME}")
     print("⚡ الأوامر الجاهزة: شغل، ابحث، يوت، قف، اكمل، تخطي، ايقاف")
-    print("📊 أمر الإحصائيات: /stats (للمطور فقط)")
     
     # ▶️ بدء البوت
     try:
