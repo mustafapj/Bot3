@@ -4,8 +4,8 @@ import yt_dlp
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
 #from pytgcalls import PyTgCalls
-from pytgcalls.types import AudioPiped
-from pytgcalls.types.input_stream import InputAudioStream
+#from pytgcalls.types import AudioPiped
+#from pytgcalls.types.input_stream import InputAudioStream
 import config
 
 # قاموس لتخزين بيانات المكالمات
