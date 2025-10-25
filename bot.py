@@ -1,5 +1,7 @@
 import asyncio
 import logging
+import os
+import yt_dlp
 from telegram import Update, BotCommand, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application,
@@ -35,6 +37,17 @@ logging.basicConfig(
     level=logging.INFO
 )
 
+# 🎵 تخزين حالة التشغيل للمجموعات
+playback_status = {}
+
+# 🔍 إعدادات yt-dlp
+ydl_opts = {
+    'format': 'bestaudio/best',
+    'outtmpl': 'downloads/%(title)s.%(ext)s',
+    'quiet': True,
+    'no_warnings': True,
+}
+
 async def check_channel_subscription(user_id: int, bot) -> bool:
     """التحقق من اشتراك المستخدم في القناة"""
     try:
@@ -65,7 +78,7 @@ async def send_subscription_message(update: Update, context: ContextTypes.DEFAUL
     reply_markup = InlineKeyboardMarkup(keyboard)
     
     subscription_text = """
-🔒 **عذراً عزيزي!** 🔒
+🎵 **مرحباً بك في بوت تشغيل الموسيقى!** 🎵
 
 📢 **للاستفادة من ميزات البوت، يجب الاشتراك في قناتنا الرسمية أولاً**
 
@@ -75,10 +88,71 @@ async def send_subscription_message(update: Update, context: ContextTypes.DEFAUL
 3️⃣ استمتع بكامل ميزات البوت! 🎉
     """
     
-    if update.message:
+    # إرسال صورة ترحيبية إذا كانت موجودة
+    try:
+        if os.path.exists("welcome.jpg"):
+            await update.message.reply_photo(
+                photo=open("welcome.jpg", "rb"),
+                caption=subscription_text,
+                reply_markup=reply_markup
+            )
+        else:
+            await update.message.reply_text(subscription_text, reply_markup=reply_markup)
+    except:
         await update.message.reply_text(subscription_text, reply_markup=reply_markup)
-    elif update.callback_query:
-        await update.callback_query.message.reply_text(subscription_text, reply_markup=reply_markup)
+
+async def send_private_subscription_message(user_id: int, bot):
+    """إرسال رسالة طلب الاشتراك للعضو خاص"""
+    keyboard = [
+        [
+            InlineKeyboardButton("📢 قناة البوت", url=f"https://t.me/{CHANNEL_USERNAME}"),
+            InlineKeyboardButton("👤 المطور", url=f"https://t.me/{DEVELOPER_USERNAME}")
+        ],
+        [
+            InlineKeyboardButton("✅ تحقق من الاشتراك", callback_data="check_subscription")
+        ]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    
+    subscription_text = """
+🔒 **عذراً عزيزي!** 🔒
+
+📢 **للاستفادة من ميزات البوت في المجموعة، يجب الاشتراك في قناتنا الرسمية أولاً**
+
+⚡ **خطوات الاشتراك:**
+1️⃣ انضم إلى القناة بالضغط على الزر أدناه
+2️⃣ اضغط على زر "تحقق من الاشتراك"
+3️⃣ يمكنك استخدام البوت في المجموعة! 🎉
+    """
+    
+    try:
+        await bot.send_message(
+            chat_id=user_id,
+            text=subscription_text,
+            reply_markup=reply_markup
+        )
+    except Exception as e:
+        logging.error(f"Failed to send private message: {e}")
+
+async def check_member_subscription(user_id: int, chat_id: int, bot, update: Update = None):
+    """التحقق من اشتراك العضو في القناة وإرسال رسالة إذا لم يكن مشترك"""
+    if await is_developer(user_id, ""):
+        return True
+    
+    if await check_channel_subscription(user_id, bot):
+        return True
+    else:
+        # إرسال رسالة طلب الاشتراك للعضو خاص
+        await send_private_subscription_message(user_id, bot)
+        
+        # إرسال رسالة في المجموعة لإعلامه
+        if update and update.message:
+            await update.message.reply_text(
+                f"👋 [{update.effective_user.first_name}](tg://user?id={user_id})\n"
+                "📢 تم إرسال رسالة لك خاص، يرجى متابعتها لإكمال التحقق",
+                parse_mode='Markdown'
+            )
+        return False
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """أمر البدء مع التحقق من الاشتراك"""
@@ -106,7 +180,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 ✨ **شكراً لاشتراكك في قناتنا الرسمية**
 
-⚡ **يمكنك الآن استخدام كامل ميزات البوت**
+⚡ **الآن يمكنك استخدام كامل ميزات البوت**
     """
     
     keyboard = [
@@ -116,9 +190,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         [
             InlineKeyboardButton("📢 قناة البوت", url=f"https://t.me/{CHANNEL_USERNAME}"),
             InlineKeyboardButton("👤 التواصل مع المطور", url=f"https://t.me/{DEVELOPER_USERNAME}")
-        ],
-        [
-            InlineKeyboardButton("🎵 تشغيل الموسيقى", callback_data="play_music")
         ]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -142,60 +213,106 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.message.reply_text("✅ **تم التحقق بنجاح! شكراً لاشتراكك.**\n\nاكتب /start للبدء! 🎉")
         else:
             await query.message.reply_text("❌ **لم يتم العثور على اشتراكك.**\n\nيرجى الانضمام للقناة أولاً ثم اضغط على زر التحقق مرة أخرى.")
-    
-    elif query.data == "play_music":
-        if not await is_developer(user_id, username) and not await check_channel_subscription(user_id, context.bot):
-            await send_subscription_message(update, context)
-            return
-        
-        await query.message.reply_text("🎵 **سيتم تشغيل الموسيقى قريباً**\n\nاستخدم الأوامر في القائمة لبدء التشغيل")
 
-async def play_music(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """تشغيل الموسيقى مع التحقق من الاشتراك"""
+# 🎵 أوامر التشغيل في المجموعات
+async def handle_play_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالجة أمر شغل"""
     user_id = update.effective_user.id
-    username = update.effective_user.username
+    chat_id = update.effective_chat.id
     
-    if not await is_developer(user_id, username) and not await check_channel_subscription(user_id, context.bot):
-        await send_subscription_message(update, context)
+    # التحقق من الاشتراك أولاً
+    if not await check_member_subscription(user_id, chat_id, context.bot, update):
         return
     
-    await update.message.reply_text("🎵 **جاري التشغيل...**\n\nسيتم تشغيل طلبك قريباً!")
-
-async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """أمر المساعدة"""
-    user_id = update.effective_user.id
-    username = update.effective_user.username
-    
-    if not await is_developer(user_id, username) and not await check_channel_subscription(user_id, context.bot):
-        await send_subscription_message(update, context)
+    if not context.args:
+        await update.message.reply_text("❌ يرجى كتابة اسم الأغنية بعد كلمة `شغل`\nمثال: `شغل حسام الرسام`")
         return
     
-    help_text = """
-🆘 **مركز المساعدة**
-
-🎵 **أوامر الموسيقى:**
-/play - تشغيل أغنية
-/stop - إيقاف التشغيل
-/pause - إيقاف مؤقت
-/resume - استئناف التشغيل
-/next - التالية
-
-🔧 **أوامر أخرى:**
-/start - بدء البوت
-/help - المساعدة
-
-📢 **مهم:** يجب الاشتراك في قناتنا @MASTFA_20022 لاستخدام البوت
-    """
+    song_name = " ".join(context.args)
     
-    keyboard = [
-        [
-            InlineKeyboardButton("📢 قناة البوت", url=f"https://t.me/{CHANNEL_USERNAME}"),
-            InlineKeyboardButton("👤 المطور", url=f"https://t.me/{DEVELOPER_USERNAME}")
-        ]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
+    # محاكاة عملية التشغيل
+    await update.message.reply_text(f"🎵 **جاري تشغيل:** {song_name}\n\n⚡ يتم التشغيل في المجموعة...")
+
+async def handle_search_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالجة أمر ابحث"""
+    user_id = update.effective_user.id
+    chat_id = update.effective_chat.id
     
-    await update.message.reply_text(help_text, reply_markup=reply_markup)
+    # التحقق من الاشتراك أولاً
+    if not await check_member_subscription(user_id, chat_id, context.bot, update):
+        return
+    
+    if not context.args:
+        await update.message.reply_text("❌ يرجى كتابة اسم الأغنية بعد كلمة `ابحث`\nمثال: `ابحث اغنية حزينة`")
+        return
+    
+    song_name = " ".join(context.args)
+    
+    # محاكاة عملية البحث
+    await update.message.reply_text(f"🔍 **جاري البحث عن:** {song_name}\n\n📋 سيتم عرض النتائج قريباً...")
+
+async def handle_youtube_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالجة أمر يوت"""
+    user_id = update.effective_user.id
+    chat_id = update.effective_chat.id
+    
+    # التحقق من الاشتراك أولاً
+    if not await check_member_subscription(user_id, chat_id, context.bot, update):
+        return
+    
+    if not context.args:
+        await update.message.reply_text("❌ يرجى كتابة اسم الأغنية بعد كلمة `يوت`\nمثال: `يوت اغنية رومانسية`")
+        return
+    
+    song_name = " ".join(context.args)
+    
+    # محاكاة عملية التحميل
+    await update.message.reply_text(f"📥 **جاري تحميل:** {song_name}\n\n⏳ المدة: دقيقة واحدة\nسيتم إرسالها كملف صوتي...")
+
+# 🎵 أوامر التحكم في التشغيل
+async def handle_pause_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالجة أمر قف"""
+    user_id = update.effective_user.id
+    chat_id = update.effective_chat.id
+    
+    # التحقق من الاشتراك أولاً
+    if not await check_member_subscription(user_id, chat_id, context.bot, update):
+        return
+    
+    await update.message.reply_text("⏸️ **تم إيقاف التشغيل مؤقتاً**\n\nاكتب `اكمل` لاستئناف التشغيل")
+
+async def handle_resume_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالجة أمر اكمل"""
+    user_id = update.effective_user.id
+    chat_id = update.effective_chat.id
+    
+    # التحقق من الاشتراك أولاً
+    if not await check_member_subscription(user_id, chat_id, context.bot, update):
+        return
+    
+    await update.message.reply_text("▶️ **تم استئناف التشغيل**\n\nاكتب `قف` للإيقاف المؤقت")
+
+async def handle_skip_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالجة أمر تخطي"""
+    user_id = update.effective_user.id
+    chat_id = update.effective_chat.id
+    
+    # التحقق من الاشتراك أولاً
+    if not await check_member_subscription(user_id, chat_id, context.bot, update):
+        return
+    
+    await update.message.reply_text("⏭️ **تم تخطي الأغنية**\n\nجاري تشغيل التالية...")
+
+async def handle_stop_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """معالجة أمر ايقاف"""
+    user_id = update.effective_user.id
+    chat_id = update.effective_chat.id
+    
+    # التحقق من الاشتراك أولاً
+    if not await check_member_subscription(user_id, chat_id, context.bot, update):
+        return
+    
+    await update.message.reply_text("⏹️ **تم إيقاف التشغيل**\n\nاكتب `شغل` لتشغيل أغنية جديدة")
 
 async def group_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """رسالة ترحيبية عند إضافة البوت للمجموعة"""
@@ -204,9 +321,18 @@ async def group_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 ⚡ **شكراً لإضافتي إلى مجموعتك**
 
-📢 **مهم:** يجب على جميع الأعضاء الاشتراك في قناتنا @MASTFA_20022 لاستخدام البوت
+🎶 **أوامر التشغيل:**
+`شغل + اسم الأغنية` - تشغيل مباشر
+`ابحث + اسم الأغنية` - بحث في اليوتيوب
+`يوت + اسم الأغنية` - تحميل كملف صوتي
 
-🎶 **استمتع بتشغيل الموسيقى مع أصدقائك!**
+⏯️ **أوامر التحكم:**
+`قف` - إيقاف مؤقت
+`اكمل` - استئناف التشغيل
+`تخطي` - التالية
+`ايقاف` - إيقاف كامل
+
+📢 **مهم:** يجب على جميع الأعضاء الاشتراك في @MASTFA_20022
     """
     
     keyboard = [
@@ -217,7 +343,7 @@ async def group_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    await update.message.reply_text(welcome_text, reply_markup=reply_markup)
+    await update.message.reply_text(welcome_text, reply_markup=reply_markup, parse_mode='Markdown')
 
 async def set_bot_commands(application):
     """تعيين أوامر البوت في القائمة"""
@@ -225,9 +351,6 @@ async def set_bot_commands(application):
         BotCommand("start", "بدء استخدام البوت 🚀"),
         BotCommand("play", "تشغيل الموسيقى 🎵"),
         BotCommand("stop", "إيقاف التشغيل ⏹️"),
-        BotCommand("pause", "إيقاف مؤقت ⏸️"),
-        BotCommand("resume", "استئناف التشغيل 🔊"),
-        BotCommand("next", "الأغنية التالية ▶️"),
         BotCommand("help", "المساعدة والدعم 🆘"),
     ]
     
@@ -251,19 +374,23 @@ def main():
         .build()
     )
     
-    # ➕ إضافة المعالجات
+    # ➕ إضافة المعالجات للأوامر
     application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("play", play_music))
-    application.add_handler(CommandHandler("stop", play_music))
-    application.add_handler(CommandHandler("pause", play_music))
-    application.add_handler(CommandHandler("resume", play_music))
-    application.add_handler(CommandHandler("next", play_music))
-    application.add_handler(CommandHandler("help", help_command))
+    application.add_handler(CommandHandler("help", start))
+    
+    # 🎵 معالجة الأوامر النصية في المجموعات
+    application.add_handler(MessageHandler(filters.Regex(r'^شغل\s+.+'), handle_play_command))
+    application.add_handler(MessageHandler(filters.Regex(r'^ابحث\s+.+'), handle_search_command))
+    application.add_handler(MessageHandler(filters.Regex(r'^يوت\s+.+'), handle_youtube_command))
+    application.add_handler(MessageHandler(filters.Regex(r'^قف$'), handle_pause_command))
+    application.add_handler(MessageHandler(filters.Regex(r'^اكمل$'), handle_resume_command))
+    application.add_handler(MessageHandler(filters.Regex(r'^تخطي$'), handle_skip_command))
+    application.add_handler(MessageHandler(filters.Regex(r'^ايقاف$'), handle_stop_command))
     
     # 🔘 معالجة الأزرار
     application.add_handler(CallbackQueryHandler(handle_callback))
     
-    # 🏷️ معالجة الرسائل في المجموعات
+    # 🏷️ معالجة إضافة البوت للمجموعات
     application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, group_start))
     
     # 📝 تعيين أوامر القائمة
@@ -272,6 +399,7 @@ def main():
     print("🎵 بوت الموسيقى يعمل بنجاح!")
     print(f"📢 القناة: @{CHANNEL_USERNAME}")
     print(f"👤 المطور: @{DEVELOPER_USERNAME}")
+    print("⚡ الأوامر الجاهزة: شغل، ابحث، يوت، قف، اكمل، تخطي، ايقاف")
     
     # ▶️ بدء البوت
     try:
@@ -286,4 +414,8 @@ def main():
         main()
 
 if __name__ == "__main__":
+    # إنشاء مجلد التحميلات
+    if not os.path.exists("downloads"):
+        os.makedirs("downloads")
+    
     main()
