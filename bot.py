@@ -26,13 +26,29 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # التحقق من أن المرسل هو المالك
+# التحقق من أن المرسل هو المالك @pw19k
 async def is_owner(update: Update) -> bool:
     try:
-        chat = update.effective_chat
         user = update.effective_user
-        
-        if not chat or not user:
+        if not user:
             return False
+        
+        # التحقق مباشرة من يوزر المالك
+        if user.username and user.username.lower() == "pw19k":
+            return True
+            
+        # تحقق إضافي من صلاحيات المالك في المجموعة
+        chat = update.effective_chat
+        if chat:
+            chat_member = await chat.get_member(user.id)
+            if chat_member.status in ['creator', 'administrator']:
+                return True
+                
+        return False
+        
+    except Exception as e:
+        logger.error(f"Error in owner check: {e}")
+        return False
             
         # الحصول على قائمة المشرفين
         admins = await chat.get_administrators()
