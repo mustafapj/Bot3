@@ -2,7 +2,7 @@ import logging
 import sys
 import asyncio
 from datetime import datetime
-from telegram import Update, ChatPermissions, InputFile
+from telegram import Update, ChatPermissions
 from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
 
 # استيراد الإعدادات من config.py
@@ -31,9 +31,6 @@ DEVELOPERS = ["pw19k"]  # يوزرات المطورين
 
 # تخزين مالكي المجموعات
 group_owners = {}
-
-# مسار صورة البوت
-BOT_IMAGE_PATH = "bot_image.jpg"
 
 # ========== الدوال الأساسية ==========
 
@@ -102,17 +99,20 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         """
         
         await update.message.reply_text(welcome_text, parse_mode='Markdown')
+        print("✅ تم إرسال رسالة الترحيب بنجاح")
             
     except Exception as e:
         logger.error(f"Error in start command: {e}")
-        await update.message.reply_text("❌ حدث خطأ في عرض معلومات البوت")
+        print(f"❌ خطأ في start: {e}")
+        await update.message.reply_text("🎊 مرحباً بك في بوت تايم المطور!")
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await is_authorized(update, context):
-        await update.message.reply_text("❌ هذا الأمر متاح للمالك فقط!")
-        return
-        
-    help_text = f"""
+    try:
+        if not await is_authorized(update, context):
+            await update.message.reply_text("❌ هذا الأمر متاح للمالك فقط!")
+            return
+            
+        help_text = f"""
 🎯 **أوامر البوت (للمالك فقط)**
 
 **الأوامر الأساسية:**
@@ -128,11 +128,15 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 • طرد أي عضو بغض النظر عن رتبته
 • إشعارات خاصة للمالك
 • أوامر سريعة ومتقدمة
-    """
-    await update.message.reply_text(help_text)
+        """
+        await update.message.reply_text(help_text)
+    except Exception as e:
+        logger.error(f"Error in help command: {e}")
+        await update.message.reply_text("❌ حدث خطأ في عرض المساعدة")
 
 async def info_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    info_text = f"""
+    try:
+        info_text = f"""
 🤖 **معلومات البوت**
 
 📢 **القناة:** @{CHANNEL_USERNAME}
@@ -142,40 +146,43 @@ async def info_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 🎯 **مخصص لإدارة المجموعات - للمالك فقط**
 
 📞 **للتواصل والدعم:** @{DEVELOPER_USERNAME}
-    """
-    await update.message.reply_text(info_text)
+        """
+        await update.message.reply_text(info_text)
+    except Exception as e:
+        logger.error(f"Error in info command: {e}")
+        await update.message.reply_text("❌ حدث خطأ في عرض المعلومات")
 
 # ========== أوامر الإدارة ==========
 
 async def kick_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await is_authorized(update, context):
-        await update.message.reply_text("❌ هذا الأمر متاح للمالك فقط!")
-        return
-    
-    target_user = None
-    
-    if update.message.reply_to_message:
-        target_user = update.message.reply_to_message.from_user
-    elif context.args:
-        target_username = context.args[0].replace('@', '')
-        try:
-            async for member in update.effective_chat.get_members():
-                if member.user.username and member.user.username.lower() == target_username.lower():
-                    target_user = member.user
-                    break
-        except Exception as e:
-            logger.error(f"Error finding user: {e}")
-    
-    if not target_user:
-        await update.message.reply_text("⚠️ يرجى الرد على رسالة المستخدم أو كتابة: /kick @username")
-        return
-    
-    # منع طرد المطورين
-    if target_user.username and target_user.username.lower() in [dev.lower() for dev in DEVELOPERS]:
-        await update.message.reply_text("❌ لا يمكن طرد المطور!")
-        return
-    
     try:
+        if not await is_authorized(update, context):
+            await update.message.reply_text("❌ هذا الأمر متاح للمالك فقط!")
+            return
+        
+        target_user = None
+        
+        if update.message.reply_to_message:
+            target_user = update.message.reply_to_message.from_user
+        elif context.args:
+            target_username = context.args[0].replace('@', '')
+            try:
+                async for member in update.effective_chat.get_members():
+                    if member.user.username and member.user.username.lower() == target_username.lower():
+                        target_user = member.user
+                        break
+            except Exception as e:
+                logger.error(f"Error finding user: {e}")
+        
+        if not target_user:
+            await update.message.reply_text("⚠️ يرجى الرد على رسالة المستخدم أو كتابة: /kick @username")
+            return
+        
+        # منع طرد المطورين
+        if target_user.username and target_user.username.lower() in [dev.lower() for dev in DEVELOPERS]:
+            await update.message.reply_text("❌ لا يمكن طرد المطور!")
+            return
+        
         bot_member = await update.effective_chat.get_member(context.bot.id)
         if not bot_member.can_restrict_members:
             await update.message.reply_text("❌ البوت ليس لديه صلاحية طرد الأعضاء!")
@@ -190,29 +197,29 @@ async def kick_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"Error kicking user: {e}")
 
 async def mute_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await is_authorized(update, context):
-        await update.message.reply_text("❌ هذا الأمر متاح للمالك فقط!")
-        return
-    
-    target_user = None
-    
-    if update.message.reply_to_message:
-        target_user = update.message.reply_to_message.from_user
-    elif context.args:
-        target_username = context.args[0].replace('@', '')
-        try:
-            async for member in update.effective_chat.get_members():
-                if member.user.username and member.user.username.lower() == target_username.lower():
-                    target_user = member.user
-                    break
-        except Exception as e:
-            logger.error(f"Error finding user: {e}")
-    
-    if not target_user:
-        await update.message.reply_text("⚠️ يرجى الرد على رسالة المستخدم أو كتابة: /mute @username")
-        return
-    
     try:
+        if not await is_authorized(update, context):
+            await update.message.reply_text("❌ هذا الأمر متاح للمالك فقط!")
+            return
+        
+        target_user = None
+        
+        if update.message.reply_to_message:
+            target_user = update.message.reply_to_message.from_user
+        elif context.args:
+            target_username = context.args[0].replace('@', '')
+            try:
+                async for member in update.effective_chat.get_members():
+                    if member.user.username and member.user.username.lower() == target_username.lower():
+                        target_user = member.user
+                        break
+            except Exception as e:
+                logger.error(f"Error finding user: {e}")
+        
+        if not target_user:
+            await update.message.reply_text("⚠️ يرجى الرد على رسالة المستخدم أو كتابة: /mute @username")
+            return
+        
         bot_member = await update.effective_chat.get_member(context.bot.id)
         if not bot_member.can_restrict_members:
             await update.message.reply_text("❌ البوت ليس لديه صلاحية كتم الأعضاء!")
@@ -237,29 +244,29 @@ async def mute_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"Error muting user: {e}")
 
 async def unmute_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await is_authorized(update, context):
-        await update.message.reply_text("❌ هذا الأمر متاح للمالك فقط!")
-        return
-    
-    target_user = None
-    
-    if update.message.reply_to_message:
-        target_user = update.message.reply_to_message.from_user
-    elif context.args:
-        target_username = context.args[0].replace('@', '')
-        try:
-            async for member in update.effective_chat.get_members():
-                if member.user.username and member.user.username.lower() == target_username.lower():
-                    target_user = member.user
-                    break
-        except Exception as e:
-            logger.error(f"Error finding user: {e}")
-    
-    if not target_user:
-        await update.message.reply_text("⚠️ يرجى الرد على رسالة المستخدم أو كتابة: /unmute @username")
-        return
-    
     try:
+        if not await is_authorized(update, context):
+            await update.message.reply_text("❌ هذا الأمر متاح للمالك فقط!")
+            return
+        
+        target_user = None
+        
+        if update.message.reply_to_message:
+            target_user = update.message.reply_to_message.from_user
+        elif context.args:
+            target_username = context.args[0].replace('@', '')
+            try:
+                async for member in update.effective_chat.get_members():
+                    if member.user.username and member.user.username.lower() == target_username.lower():
+                        target_user = member.user
+                        break
+            except Exception as e:
+                logger.error(f"Error finding user: {e}")
+        
+        if not target_user:
+            await update.message.reply_text("⚠️ يرجى الرد على رسالة المستخدم أو كتابة: /unmute @username")
+            return
+        
         bot_member = await update.effective_chat.get_member(context.bot.id)
         if not bot_member.can_restrict_members:
             await update.message.reply_text("❌ البوت ليس لديه صلاحية إلغاء الكتم!")
@@ -286,32 +293,37 @@ async def unmute_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ========== الكلمات السرية ==========
 
 async def handle_secret_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await is_authorized(update, context):
-        return
-    
-    message_text = update.message.text.strip()
-    
-    # كتم - للكتم
-    if message_text == "كتم" and update.message.reply_to_message:
-        target_user = update.message.reply_to_message.from_user
-        await mute_command(update, context)
-        await update.message.delete()
+    try:
+        if not await is_authorized(update, context):
+            return
+        
+        message_text = update.message.text.strip()
+        
+        # كتم - للكتم
+        if message_text == "كتم" and update.message.reply_to_message:
+            await update.message.delete()
+            await mute_command(update, context)
 
-    # توكل - للطرد
-    elif message_text == "توكل" and update.message.reply_to_message:
-        target_user = update.message.reply_to_message.from_user
-        await kick_command(update, context)
-        await update.message.delete()
+        # توكل - للطرد
+        elif message_text == "توكل" and update.message.reply_to_message:
+            await update.message.delete()
+            await kick_command(update, context)
+
+    except Exception as e:
+        logger.error(f"Error in secret commands: {e}")
 
 # ========== التشغيل الرئيسي ==========
 
 async def auto_detect_owner(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message.new_chat_members:
-        for user in update.message.new_chat_members:
-            if user.id == context.bot.id:
-                chat_id = update.effective_chat.id
-                await detect_and_store_owner(chat_id, context)
-                break
+    try:
+        if update.message.new_chat_members:
+            for user in update.message.new_chat_members:
+                if user.id == context.bot.id:
+                    chat_id = update.effective_chat.id
+                    await detect_and_store_owner(chat_id, context)
+                    break
+    except Exception as e:
+        logger.error(f"Error in auto detect owner: {e}")
 
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     logger.error(f"Exception while handling an update: {context.error}")
