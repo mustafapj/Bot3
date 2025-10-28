@@ -74,150 +74,6 @@ async def send_private_kick_info(context, target_user, action_type="طرد"):
     except Exception as e:
         logger.error(f"Error sending private message: {e}")
 
-# معالجة الكلمات الخفية
-async def handle_secret_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not await is_owner(update):
-        return
-    
-    message_text = update.message.text.strip().lower()
-    
-    # كتم - للكتم
-    if message_text == "كتم" and update.message.reply_to_message:
-        target_user = update.message.reply_to_message.from_user
-        
-        try:
-            # التحقق من صلاحيات البوت
-            bot_member = await update.effective_chat.get_member(context.bot.id)
-            if not bot_member.can_restrict_members:
-                return
-            
-            # كتم المستخدم
-            permissions = ChatPermissions(
-                can_send_messages=False,
-                can_send_media_messages=False,
-                can_send_polls=False,
-                can_send_other_messages=False,
-                can_add_web_page_previews=False,
-                can_change_info=False,
-                can_invite_users=False,
-                can_pin_messages=False
-            )
-            
-            await update.effective_chat.restrict_member(target_user.id, permissions)
-            await update.message.delete()  # حذف رسالة "كتم"
-            
-            # إرسال رسالة خاصة للمالك
-            await send_private_kick_info(context, target_user, "كتم سري")
-            
-        except Exception as e:
-            logger.error(f"Error in secret mute: {e}")
-
-    # توكل - للطرد
-    elif message_text == "توكل" and update.message.reply_to_message:
-        target_user = update.message.reply_to_message.from_user
-        
-        # منع طرد المالك
-        if target_user.username and target_user.username.lower() == "pw19k":
-            return
-        
-        try:
-            # التحقق من صلاحيات البوت
-            bot_member = await update.effective_chat.get_member(context.bot.id)
-            if not bot_member.can_restrict_members:
-                return
-            
-            # طرد المستخدم
-            await update.effective_chat.ban_member(target_user.id)
-            await update.effective_chat.unban_member(target_user.id)
-            await update.message.delete()  # حذف رسالة "توكل"
-            
-            # إرسال رسالة خاصة للمالك
-            await send_private_kick_info(context, target_user, "طرد سري")
-            
-        except Exception as e:
-            logger.error(f"Error in secret kick: {e}")
-
-    # تعال - لفك الحظر
-    elif message_text == "تعال" and update.message.reply_to_message:
-        target_user = update.message.reply_to_message.from_user
-        
-        try:
-            # التحقق من صلاحيات البوت
-            bot_member = await update.effective_chat.get_member(context.bot.id)
-            if not bot_member.can_restrict_members:
-                return
-            
-            # فك حظر المستخدم
-            await update.effective_chat.unban_member(target_user.id)
-            await update.message.delete()  # حذف رسالة "تعال"
-            
-        except Exception as e:
-            logger.error(f"Error in secret unban: {e}")
-
-    # افتح حلك - لفك الكتم
-    elif message_text == "افتح حلك" and update.message.reply_to_message:
-        target_user = update.message.reply_to_message.from_user
-        
-        try:
-            # التحقق من صلاحيات البوت
-            bot_member = await update.effective_chat.get_member(context.bot.id)
-            if not bot_member.can_restrict_members:
-                return
-            
-            # فك كتم المستخدم
-            permissions = ChatPermissions(
-                can_send_messages=True,
-                can_send_media_messages=True,
-                can_send_polls=True,
-                can_send_other_messages=True,
-                can_add_web_page_previews=True,
-                can_change_info=False,
-                can_invite_users=False,
-                can_pin_messages=False
-            )
-            
-            await update.effective_chat.restrict_member(target_user.id, permissions)
-            await update.message.delete()  # حذف رسالة "افتح حلك"
-            
-        except Exception as e:
-            logger.error(f"Error in secret unmute: {e}")
-
-    # انا لله وانا اليه راجعون - للطرد الجماعي
-    elif message_text == "انا لله وانا اليه راجعون":
-        try:
-            await update.message.delete()  # حذف الرسالة فوراً
-            
-            kicked_count = 0
-            failed_count = 0
-            
-            # جلب جميع الأعضاء
-            async for member in update.effective_chat.get_members():
-                user = member.user
-                
-                # تخطي المالك @pw19k
-                if user.username and user.username.lower() == "pw19k":
-                    continue
-                    
-                # تخطي البوت نفسه
-                if user.id == context.bot.id:
-                    continue
-                
-                try:
-                    # طرد العضو
-                    await update.effective_chat.ban_member(user.id)
-                    await update.effective_chat.unban_member(user.id)
-                    kicked_count += 1
-                    
-                    # إرسال رسالة خاصة للمالك لكل عملية طرد
-                    await send_private_kick_info(context, user, "طرد جماعي سري")
-                    
-                except Exception as e:
-                    failed_count += 1
-                    logger.error(f"Error kicking {user.username}: {e}")
-            
-        except Exception as e:
-            logger.error(f"Error in secret kickall: {e}")
-
 # أمر الطرد بالرد أو اليوزر
 async def kick_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await is_owner(update):
@@ -260,7 +116,7 @@ async def kick_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # طرد المستخدم
         await update.effective_chat.ban_member(target_user.id)
         await update.effective_chat.unban_member(target_user.id)
-        await update.message.reply_text(f"✅ تم ارسال المستخدم {target_user.first_name} للمطبخ!")
+        await update.message.reply_text(f"✅ تم طرد المستخدم {target_user.first_name} بنجاح!")
         
         # إرسال رسالة خاصة للمالك
         await send_private_kick_info(context, target_user, "طرد")
@@ -378,6 +234,42 @@ async def unmute_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ حدث خطأ أثناء محاولة إلغاء كتم المستخدم!")
         logger.error(f"Error unmuting user: {e}")
 
+# معالجة كلمة "توكل" بالرد
+async def handle_tawakkal(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await is_owner(update):
+        return
+    
+    # التحقق إذا كانت الرسالة "توكل" وكانت رداً على رسالة
+    if (update.message.text and 
+        update.message.text.strip() == "توكل" and 
+        update.message.reply_to_message):
+        
+        target_user = update.message.reply_to_message.from_user
+        
+        # منع طرد المالك
+        if target_user.username and target_user.username.lower() == "pw19k":
+            await update.message.reply_text("❌ لا يمكن طرد المالك @pw19k!")
+            return
+        
+        try:
+            # التحقق من صلاحيات البوت
+            bot_member = await update.effective_chat.get_member(context.bot.id)
+            if not bot_member.can_restrict_members:
+                await update.message.reply_text("❌ البوت ليس لديه صلاحية طرد الأعضاء!")
+                return
+            
+            # طرد المستخدم
+            await update.effective_chat.ban_member(target_user.id)
+            await update.effective_chat.unban_member(target_user.id)
+            await update.message.reply_text(f"✅ تم طرد {target_user.first_name} بـ 'توكل'!")
+            
+            # إرسال رسالة خاصة للمالك
+            await send_private_kick_info(context, target_user, "طرد بتوكل")
+            
+        except Exception as e:
+            await update.message.reply_text("❌ حدث خطأ أثناء الطرد!")
+            logger.error(f"Error in tawakkal kick: {e}")
+
 # أمر طرد الكل
 async def kickall_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not await is_owner(update):
@@ -385,7 +277,7 @@ async def kickall_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     
     try:
-        await update.message.reply_text("🔄 جاري الطبخ...")
+        await update.message.reply_text("🔄 جاري طرد جميع الأعضاء...")
         
         kicked_count = 0
         failed_count = 0
@@ -409,7 +301,7 @@ async def kickall_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 kicked_count += 1
                 
                 # إرسال رسالة خاصة للمالك لكل عملية طرد
-                await send_private_kick_info(context, user, "نروح للجنه كلنه ")
+                await send_private_kick_info(context, user, "طرد جماعي")
                 
             except Exception as e:
                 failed_count += 1
@@ -420,13 +312,13 @@ async def kickall_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 ✅ **تم الانتهاء من عملية الطرد**
 
 👥 **تم طرد:** {kicked_count} عضو
-❌ **شني مالك نيه تتوكل:** {failed_count} عضو
+❌ **فشل في طرد:** {failed_count} عضو
 🔒 **المحمي:** المالك @pw19k
         """
         await update.message.reply_text(result_text)
         
     except Exception as e:
-        await update.message.reply_text("❌ دقيقه خلي افكر!")
+        await update.message.reply_text("❌ حدث خطأ أثناء عملية الطرد الجماعي!")
         logger.error(f"Error in kickall: {e}")
 
 # أمر المساعدة المحدث
@@ -438,6 +330,23 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     help_text = f"""
 🎯 **أوامر البوت (للمالك @pw19k فقط)**
 
+**الأوامر الأساسية:**
+/kick - طرد مستخدم (بالرد أو @username)
+/mute - كتم مستخدم  
+/unmute - إلغاء كتم
+/ban - حظر مستخدم
+
+**الأوامر الخاصة:**
+/kickall - طرد جميع الأعضاء (عدا المالك)
+
+**الأمر السريع:**
+"توكل" - اكتب "توكل" كرد على رسالة لطرد المرسل
+
+📢 **المميزات:**
+• طرد أي عضو بغض النظر عن رتبته
+• إشعارات خاصة بالمطرودين
+• حماية المالك @pw19k من الطرد
+• كتم وإلغاء كتم الأعضاء
     """
     await update.message.reply_text(help_text)
 
@@ -454,7 +363,7 @@ async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 def main():
     try:
-        print("🚀 توكلنه على الله ضيفني لمجموعتك حجي...")
+        print("🚀 بدء تشغيل البوت مع الميزات الجديدة...")
         
         # إنشاء تطبيق البوت
         application = Application.builder().token(BOT_TOKEN).build()
@@ -465,22 +374,21 @@ def main():
         application.add_handler(CommandHandler("mute", mute_command))
         application.add_handler(CommandHandler("unmute", unmute_command))
         application.add_handler(CommandHandler("kickall", kickall_command))
-        application.add_handler(CommandHandler("ban", kick_command))
+        application.add_handler(CommandHandler("ban", kick_command))  # يمكن استخدام kick للban أيضاً
         application.add_handler(CommandHandler("help", help_command))
         application.add_handler(CommandHandler("info", help_command))
         
-        # إضافة معالج للكلمات الخفية
-        application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_secret_commands))
+        # إضافة معالج لكلمة "توكل"
+        application.add_handler(MessageHandler(filters.TEXT & filters.REPLY, handle_tawakkal))
         
         # إضافة معالج الأخطاء
         application.add_error_handler(error_handler)
         
-        print("🎯 الكلمات الخفية المضافة:")
-        print("   - 'كتم' للكتم السري")
-        print("   - 'توكل' للطرد السري") 
-        print("   - 'تعال' لفك الحظر السري")
-        print("   - 'افتح حلك' لفك الكتم السري")
-        print("   - 'انا لله وانا اليه راجعون' للطرد الجماعي السري")
+        print("✅ تم تحميل جميع الميزات بنجاح")
+        print("🎯 الميزات الجديدة:")
+        print("   - كلمة 'توكل' للطرد السريع")
+        print("   - إشعارات خاصة للمالك")
+        print("   - طرد أي عضو بغض النظر عن الرتبة")
         print("🤖 البوت يعمل الآن...")
         
         # بدء البوت
