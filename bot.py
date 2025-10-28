@@ -1,149 +1,372 @@
-import os
-import json
 import logging
+import sys
 import asyncio
-from datetime import datetime
-from telegram import Update, BotCommand, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import (
-    Application, CommandHandler, ContextTypes, MessageHandler, filters, ChatMemberHandler
+from telegram import Update, ChatPermissions
+from telegram.ext import Application, CommandHandler, ContextTypes, MessageHandler, filters
+
+# استيراد الإعدادات من config.py
+try:
+    from config import BOT_TOKEN, CHANNEL_USERNAME, DEVELOPER_USERNAME
+    from config import READ_TIMEOUT, WRITE_TIMEOUT, CONNECT_TIMEOUT, POOL_TIMEOUT
+    print("✅ تم تحميل الإعدادات بنجاح من config.py")
+except ImportError as e:
+    print(f"❌ خطأ في تحميل الإعدادات: {e}")
+    sys.exit(1)
+
+# إعداد التسجيل
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO,
+    handlers=[
+        logging.FileHandler("bot.log"),
+        logging.StreamHandler(sys.stdout)
+    ]
 )
 
-# الملفات الداخلية
-from config import *
-from credentials import *
-from messages import *
-from utils.music_manager import *
-from utils.helpers import *
+logger = logging.getLogger(__name__)
 
-# إعداد السجل
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("ShamsMusic")
+# التحقق من أن المرسل هو المالك
+async def is_owner(update: Update) -> bool:
+    try:
+        chat = update.effective_chat
+        user = update.effective_user
+        
+        if not chat or not user:
+            return False
+            
+        # الحصول على قائمة المشرفين
+        admins = await chat.get_administrators()
+        
+        # المالك هو أول مشرف في القائمة
+        owner = admins[0].user if admins else None
+        
+        if owner and user.id == owner.id:
+            return True
+            
+        return False
+        
+    except Exception as e:
+        logger.error(f"Error in owner check: {e}")
+        return False
 
-# بيانات التشغيل المؤقتة
-bot_stats = {
-    "start_time": datetime.now(),
-    "total_plays": 0
-}
-
-# ملفات البيانات
-USERS_FILE = "data/users.json"
-GROUPS_FILE = "data/groups.json"
-STATS_FILE = "data/stats.json"
-
-# ========= أدوات تخزين ========= #
-def load_json(path):
-    if not os.path.exists(path):
-        with open(path, "w") as f:
-            f.write("{}")
-    with open(path, "r") as f:
-        return json.load(f)
-
-def save_json(path, data):
-    with open(path, "w") as f:
-        json.dump(data, f, indent=4)
-
-# ========= مراقبة المستخدمين والمجموعات ========= #
-def add_user(user_id):
-    users = load_json(USERS_FILE)
-    if str(user_id) not in users:
-        users[str(user_id)] = {"joined_at": str(datetime.now())}
-        save_json(USERS_FILE, users)
-
-def add_group(chat_id, title):
-    groups = load_json(GROUPS_FILE)
-    if str(chat_id) not in groups:
-        groups[str(chat_id)] = {"title": title, "added_at": str(datetime.now())}
-        save_json(GROUPS_FILE, groups)
-
-# ========= الأوامر ========= #
-async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    chat = update.effective_chat
-
-    # الاشتراك الإجباري
-    if not await is_developer(user.id, user.username):
-        if not await check_channel_subscription(user.id, context.bot):
-            await update.message.reply_text(**msg_subscribe_required())
+# أمر الطرد بالرد أو اليوزر
+async def kick_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await is_owner(update):
+        await update.message.reply_text("❌ هذا الأمر متاح للمالك فقط!")
+        return
+    
+    target_user = None
+    
+    # التحقق إذا كان الأمر عن طريق الرد
+    if update.message.reply_to_message:
+        target_user = update.message.reply_to_message.from_user
+    
+    # إذا لم يكن رد، التحقق من اليوزر في الأمر
+    elif context.args:
+        target_username = context.args[0].replace('@', '')
+        try:
+            async for member in update.effective_chat.get_members():
+                if member.user.username and member.user.username.lower() == target_username.lower():
+                    target_user = member.user
+                    break
+        except Exception as e:
+            logger.error(f"Error finding user: {e}")
+    
+    if not target_user:
+        await update.message.reply_text("⚠️ يرجى الرد على رسالة المستخدم أو كتابة: /kick @username")
+        return
+    
+    try:
+        # التحقق من أن البوت لديه الصلاحيات
+        bot_member = await update.effective_chat.get_member(context.bot.id)
+        if not bot_member.can_restrict_members:
+            await update.message.reply_text("❌ البوت ليس لديه صلاحية طرد الأعضاء!")
             return
+        
+        # طرد المستخدم
+        await update.effective_chat.ban_member(target_user.id)
+        await update.effective_chat.unban_member(target_user.id)
+        await update.message.reply_text(f"✅ تم طرد المستخدم {target_user.first_name} بنجاح!")
+        
+    except Exception as e:
+        await update.message.reply_text("❌ حدث خطأ أثناء محاولة طرد المستخدم!")
+        logger.error(f"Error kicking user: {e}")
 
-    # تسجيل المستخدم أو المجموعة
-    if chat.type == "private":
-        add_user(user.id)
-    elif chat.type in ["group", "supergroup"]:
-        add_group(chat.id, chat.title)
+# أمر الكتم بالرد أو اليوزر
+async def mute_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await is_owner(update):
+        await update.message.reply_text("❌ هذا الأمر متاح للمالك فقط!")
+        return
+    
+    target_user = None
+    
+    # التحقق إذا كان الأمر عن طريق الرد
+    if update.message.reply_to_message:
+        target_user = update.message.reply_to_message.from_user
+    
+    # إذا لم يكن رد، التحقق من اليوزر في الأمر
+    elif context.args:
+        target_username = context.args[0].replace('@', '')
+        try:
+            async for member in update.effective_chat.get_members():
+                if member.user.username and member.user.username.lower() == target_username.lower():
+                    target_user = member.user
+                    break
+        except Exception as e:
+            logger.error(f"Error finding user: {e}")
+    
+    if not target_user:
+        await update.message.reply_text("⚠️ يرجى الرد على رسالة المستخدم أو كتابة: /mute @username")
+        return
+    
+    try:
+        # التحقق من أن البوت لديه الصلاحيات
+        bot_member = await update.effective_chat.get_member(context.bot.id)
+        if not bot_member.can_restrict_members:
+            await update.message.reply_text("❌ البوت ليس لديه صلاحية كتم الأعضاء!")
+            return
+        
+        # كتم المستخدم
+        permissions = ChatPermissions(
+            can_send_messages=False,
+            can_send_media_messages=False,
+            can_send_polls=False,
+            can_send_other_messages=False,
+            can_add_web_page_previews=False,
+            can_change_info=False,
+            can_invite_users=False,
+            can_pin_messages=False
+        )
+        
+        await update.effective_chat.restrict_member(target_user.id, permissions)
+        await update.message.reply_text(f"🔇 تم كتم المستخدم {target_user.first_name} بنجاح!")
+        
+    except Exception as e:
+        await update.message.reply_text("❌ حدث خطأ أثناء محاولة كتم المستخدم!")
+        logger.error(f"Error muting user: {e}")
 
-    await update.message.reply_text(**msg_welcome(user.first_name, context.bot.username))
+# أمر إلغاء الكتم بالرد أو اليوزر
+async def unmute_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await is_owner(update):
+        await update.message.reply_text("❌ هذا الأمر متاح للمالك فقط!")
+        return
+    
+    target_user = None
+    
+    # التحقق إذا كان الأمر عن طريق الرد
+    if update.message.reply_to_message:
+        target_user = update.message.reply_to_message.from_user
+    
+    # إذا لم يكن رد، التحقق من اليوزر في الأمر
+    elif context.args:
+        target_username = context.args[0].replace('@', '')
+        try:
+            async for member in update.effective_chat.get_members():
+                if member.user.username and member.user.username.lower() == target_username.lower():
+                    target_user = member.user
+                    break
+        except Exception as e:
+            logger.error(f"Error finding user: {e}")
+    
+    if not target_user:
+        await update.message.reply_text("⚠️ يرجى الرد على رسالة المستخدم أو كتابة: /unmute @username")
+        return
+    
+    try:
+        # التحقق من أن البوت لديه الصلاحيات
+        bot_member = await update.effective_chat.get_member(context.bot.id)
+        if not bot_member.can_restrict_members:
+            await update.message.reply_text("❌ البوت ليس لديه صلاحية إلغاء الكتم!")
+            return
+        
+        # إلغاء كتم المستخدم
+        permissions = ChatPermissions(
+            can_send_messages=True,
+            can_send_media_messages=True,
+            can_send_polls=True,
+            can_send_other_messages=True,
+            can_add_web_page_previews=True,
+            can_change_info=False,
+            can_invite_users=False,
+            can_pin_messages=False
+        )
+        
+        await update.effective_chat.restrict_member(target_user.id, permissions)
+        await update.message.reply_text(f"🔊 تم إلغاء كتم المستخدم {target_user.first_name} بنجاح!")
+        
+    except Exception as e:
+        await update.message.reply_text("❌ حدث خطأ أثناء محاولة إلغاء كتم المستخدم!")
+        logger.error(f"Error unmuting user: {e}")
 
+# أمر حظر المستخدم
+async def ban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await is_owner(update):
+        await update.message.reply_text("❌ هذا الأمر متاح للمالك فقط!")
+        return
+    
+    target_user = None
+    
+    # التحقق إذا كان الأمر عن طريق الرد
+    if update.message.reply_to_message:
+        target_user = update.message.reply_to_message.from_user
+    
+    # إذا لم يكن رد، التحقق من اليوزر في الأمر
+    elif context.args:
+        target_username = context.args[0].replace('@', '')
+        try:
+            async for member in update.effective_chat.get_members():
+                if member.user.username and member.user.username.lower() == target_username.lower():
+                    target_user = member.user
+                    break
+        except Exception as e:
+            logger.error(f"Error finding user: {e}")
+    
+    if not target_user:
+        await update.message.reply_text("⚠️ يرجى الرد على رسالة المستخدم أو كتابة: /ban @username")
+        return
+    
+    try:
+        # التحقق من أن البوت لديه الصلاحيات
+        bot_member = await update.effective_chat.get_member(context.bot.id)
+        if not bot_member.can_restrict_members:
+            await update.message.reply_text("❌ البوت ليس لديه صلاحية حظر الأعضاء!")
+            return
+        
+        # حظر المستخدم
+        await update.effective_chat.ban_member(target_user.id)
+        await update.message.reply_text(f"🚫 تم حظر المستخدم {target_user.first_name} بنجاح!")
+        
+    except Exception as e:
+        await update.message.reply_text("❌ حدث خطأ أثناء محاولة حظر المستخدم!")
+        logger.error(f"Error banning user: {e}")
 
-async def play_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# أمر إلغاء الحظر
+async def unban_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await is_owner(update):
+        await update.message.reply_text("❌ هذا الأمر متاح للمالك فقط!")
+        return
+    
     if not context.args:
-        await update.message.reply_text("❌ اكتب اسم الأغنية بعد /play")
+        await update.message.reply_text("⚠️ يرجى كتابة: /unban @username")
         return
+    
+    target_username = context.args[0].replace('@', '')
+    
+    try:
+        # التحقق من أن البوت لديه الصلاحيات
+        bot_member = await update.effective_chat.get_member(context.bot.id)
+        if not bot_member.can_restrict_members:
+            await update.message.reply_text("❌ البوت ليس لديه صلاحية إلغاء الحظر!")
+            return
+        
+        # إلغاء حظر المستخدم
+        await update.effective_chat.unban_member(target_username)
+        await update.message.reply_text(f"✅ تم إلغاء حظر المستخدم @{target_username} بنجاح!")
+        
+    except Exception as e:
+        await update.message.reply_text("❌ حدث خطأ أثناء محاولة إلغاء الحظر!")
+        logger.error(f"Error unbanning user: {e}")
 
-    song = " ".join(context.args)
-    await update.message.reply_text(**msg_playing(song))
-    await add_to_queue(update.effective_chat.id, song)
-    bot_stats["total_plays"] += 1
+# أمر معلومات البوت
+async def info_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    info_text = f"""
+🤖 **معلومات البوت**
 
+📢 **القناة:** @{CHANNEL_USERNAME}
+👨‍💻 **المطور:** @{DEVELOPER_USERNAME}
 
-async def pause_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await pause_music(update.effective_chat.id)
-    await update.message.reply_text(**msg_paused())
+⚡ **البوت يعمل بنجاح!**
+🎯 **مخصص لإدارة المجموعات - للمالك فقط**
 
+📋 **الأوامر المتاحة:**
+/kick - طرد مستخدم
+/mute - كتم مستخدم  
+/unmute - إلغاء كتم
+/ban - حظر مستخدم
+/unban - إلغاء حظر
+/info - معلومات البوت
+/help - المساعدة
+    """
+    await update.message.reply_text(info_text)
 
-async def resume_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await resume_music(update.effective_chat.id)
-    await update.message.reply_text(**msg_resumed())
-
-
-async def queue_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    queue = await get_queue(update.effective_chat.id)
-    await update.message.reply_text(**msg_queue(queue))
-
-
-async def now_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    current = await get_current_track(update.effective_chat.id)
-    await update.message.reply_text(**msg_now_playing(current))
-
-
-async def status_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """إحصائيات عامة للمطور"""
-    user = update.effective_user
-    if not await is_developer(user.id, user.username):
-        await update.message.reply_text("❌ هذا الأمر للمطور فقط!")
+# أمر المساعدة
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await is_owner(update):
+        await update.message.reply_text("❌ هذا الأمر متاح للمالك فقط!")
         return
+        
+    help_text = f"""
+🎯 **أوامر البوت (للمالك فقط)**
 
-    users = load_json(USERS_FILE)
-    groups = load_json(GROUPS_FILE)
-    uptime = datetime.now() - bot_stats["start_time"]
-    await update.message.reply_text(**msg_status(uptime, users, groups, bot_stats))
+**بالرد أو اليوزر:**
+/kick - طرد مستخدم من المجموعة
+/mute - كتم مستخدم في المجموعة  
+/unmute - إلغاء كتم مستخدم
+/ban - حظر مستخدم من المجموعة
 
+**بالأمر فقط:**
+/unban @username - إلغاء حظر مستخدم
 
-# ========= التشغيل الرئيسي ========= #
-async def main():
-    app = Application.builder().token(BOT_TOKEN).build()
+**معلومات:**
+/info - معلومات البوت
+/help - عرض هذه الرسالة
 
-    app.add_handler(CommandHandler("start", start_command))
-    app.add_handler(CommandHandler("play", play_command))
-    app.add_handler(CommandHandler("pause", pause_command))
-    app.add_handler(CommandHandler("resume", resume_command))
-    app.add_handler(CommandHandler("queue", queue_command))
-    app.add_handler(CommandHandler("now", now_command))
-    app.add_handler(CommandHandler("status", status_command))
+📢 **القناة:** @{CHANNEL_USERNAME}
+👨‍💻 **المطور:** @{DEVELOPER_USERNAME}
 
-    await app.bot.set_my_commands([
-        BotCommand("start", "بدء الاستخدام 🚀"),
-        BotCommand("play", "تشغيل موسيقى 🎵"),
-        BotCommand("pause", "إيقاف مؤقت ⏸️"),
-        BotCommand("resume", "استئناف ▶️"),
-        BotCommand("queue", "قائمة الانتظار 📜"),
-        BotCommand("now", "ما يُشغل الآن 🎧"),
-        BotCommand("status", "إحصائيات عامة 📈")
-    ])
+⚡ **مميزات البوت:**
+• خاص بالمالك فقط
+• يدعم الطرد والكتم بالرد أو اليوزر
+• صلاحيات مطلقة للمالك
+• آمن وسريع
+    """
+    await update.message.reply_text(help_text)
 
-    print("✅ ShamsMusic 2.7 Monitor Edition يعمل الآن...")
-    await app.run_polling()
+# أمر البدء
+async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if await is_owner(update):
+        await help_command(update, context)
+    else:
+        await update.message.reply_text("🔒 هذا البوت خاص بالمالك فقط!")
 
+# معالجة الأخطاء
+async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    logger.error(f"Exception while handling an update: {context.error}")
 
-if __name__ == "__main__":
-    asyncio.run(main())
+def main():
+    try:
+        print("🚀 بدء تشغيل البوت...")
+        
+        # إنشاء تطبيق البوت مع إعدادات الوقت
+        application = Application.builder().token(BOT_TOKEN).build()
+        
+        # إضافة handlers للأوامر
+        application.add_handler(CommandHandler("start", start_command))
+        application.add_handler(CommandHandler("kick", kick_command))
+        application.add_handler(CommandHandler("mute", mute_command))
+        application.add_handler(CommandHandler("unmute", unmute_command))
+        application.add_handler(CommandHandler("ban", ban_command))
+        application.add_handler(CommandHandler("unban", unban_command))
+        application.add_handler(CommandHandler("info", info_command))
+        application.add_handler(CommandHandler("help", help_command))
+        
+        # إضافة معالج الأخطاء
+        application.add_error_handler(error_handler)
+        
+        print("✅ تم تحميل جميع الأوامر بنجاح")
+        print(f"📢 القناة: @{CHANNEL_USERNAME}")
+        print(f"👨‍💻 المطور: @{DEVELOPER_USERNAME}")
+        print("🤖 البوت يعمل الآن...")
+        
+        # بدء البوت
+        application.run_polling(
+            drop_pending_updates=True,
+            allowed_updates=Update.ALL_TYPES
+        )
+        
+    except Exception as e:
+        logger.error(f"Error starting bot: {e}")
+        print(f"❌ خطأ في تشغيل البوت: {e}")
+
+if __name__ == '__main__':
+    main()
