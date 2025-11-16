@@ -7,7 +7,7 @@ import sys
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
 
-# إعداد التسجيل لـ Termux
+# إعداد التسجيل
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO,
@@ -17,7 +17,6 @@ logging.basicConfig(
     ]
 )
 
-# توكن البوت
 BOT_TOKEN = "7087784225:AAF-TUMXou11lHOr5VLRq37PgCEbOBqKH3U"
 
 class UsernameChecker:
@@ -27,19 +26,16 @@ class UsernameChecker:
         self.available_usernames = []
     
     async def create_session(self):
-        """إنشاء جلسة aiohttp"""
         if not self.session:
             timeout = aiohttp.ClientTimeout(total=30)
             connector = aiohttp.TCPConnector(limit=10)
             self.session = aiohttp.ClientSession(timeout=timeout, connector=connector)
     
     async def close_session(self):
-        """إغلاق الجلسة"""
         if self.session:
             await self.session.close()
     
     def generate_username(self):
-        """إنشاء يوزر خماسي عشوائي"""
         chars = string.ascii_lowercase + string.digits + '_'
         while True:
             username = ''.join(random.choices(chars, k=5))
@@ -51,11 +47,8 @@ class UsernameChecker:
                 return username
     
     async def check_username_availability(self, username):
-        """فحص اليوزر باستخدام Telegram API"""
         try:
             await self.create_session()
-            
-            # فحص عبر رابط t.me
             url = f"https://t.me/{username}"
             headers = {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
@@ -64,7 +57,6 @@ class UsernameChecker:
             async with self.session.get(url, headers=headers) as response:
                 if response.status == 200:
                     text = await response.text()
-                    # إذا كانت الصفحة تحتوي على رسالة "If you have Telegram" فاليوزر متاح
                     if "If you have <strong>Telegram</strong>" in text or "tgme_username_not_occupied" in text:
                         return True
                     return False
@@ -76,7 +68,6 @@ class UsernameChecker:
             return False
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """بدء البوت"""
     welcome_text = """
     🚀 **بوت توليد اليوزرات الخماسية المتاحة**
 
@@ -91,7 +82,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(welcome_text)
 
 async def generate_usernames(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """توليد اليوزرات"""
     user_id = update.effective_user.id
     
     if 'checker' not in context.bot_data:
@@ -101,15 +91,13 @@ async def generate_usernames(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     checker = context.bot_data['checker']
     
-    # إذا كان هناك مهمة نشطة لنفس المستخدم
     if user_id in context.bot_data['active_tasks']:
         await update.message.reply_text("⏳ لديك عملية توليد نشطة بالفعل! استخدم /stop لإيقافها")
         return
     
-    # تحديد العدد
     count = 1
     if context.args and context.args[0].isdigit():
-        count = min(int(context.args[0]), 25)  # حد أقصى 25
+        count = min(int(context.args[0]), 25)
     
     context.bot_data['active_tasks'].add(user_id)
     
@@ -133,7 +121,6 @@ async def generate_usernames(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 checker.available_usernames.append(username)
                 await update.message.reply_text(f"✅ **يوزر متاح:** @{username}")
             
-            # تحديث التقدم كل 25 محاولة
             if attempts % 25 == 0:
                 try:
                     await progress_msg.edit_text(
@@ -144,17 +131,16 @@ async def generate_usernames(update: Update, context: ContextTypes.DEFAULT_TYPE)
                 except:
                     pass
             
-            # تأخير بين المحاولات
             await asyncio.sleep(0.5)
         
-        # النتائج النهائية
         if user_id in context.bot_data['active_tasks']:
             if found_count > 0:
+                # هذا السطر تم إصلاحه
                 await update.message.reply_text(
                     f"🎉 **تم الانتهاء!**\n"
                     f"• المحاولات: {attempts}\n"
                     f"• المتاحة: {found_count}\n"
-                    f"• اليوزرات: {', '.join(['@' + name for name in checker.available_usernames[-found_count:])}"
+                    f"• اليوزرات: {', '.join(['@' + name for name in checker.available_usernames[-found_count:]])}"
                 )
             else:
                 await update.message.reply_text(f"❌ لم أجد يوزرات متاحة بعد {attempts} محاولة")
@@ -165,7 +151,6 @@ async def generate_usernames(update: Update, context: ContextTypes.DEFAULT_TYPE)
         context.bot_data['active_tasks'].discard(user_id)
 
 async def stop_generating(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """إيقاف التوليد"""
     user_id = update.effective_user.id
     if user_id in context.bot_data.get('active_tasks', set()):
         context.bot_data['active_tasks'].discard(user_id)
@@ -174,7 +159,6 @@ async def stop_generating(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⚠️ لا يوجد عملية توليد نشطة")
 
 async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """إحصائيات البوت"""
     checker = context.bot_data.get('checker')
     if checker:
         stats_text = (
@@ -189,16 +173,13 @@ async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(stats_text)
 
 async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """معالجة الأخطاء"""
     logging.error(f"Error: {context.error}")
 
 def main():
-    """الدالة الرئيسية"""
     try:
         print("🚀 بدء تشغيل البوت على Termux...")
         application = Application.builder().token(BOT_TOKEN).build()
         
-        # إضافة handlers
         application.add_handler(CommandHandler("start", start))
         application.add_handler(CommandHandler("generate", generate_usernames))
         application.add_handler(CommandHandler("stop", stop_generating))
@@ -206,13 +187,11 @@ def main():
         
         application.add_error_handler(error_handler)
         
-        # بدء البوت
         print("✅ البوت يعمل الآن! أرسل /start للبدء")
         application.run_polling(drop_pending_updates=True)
         
     except Exception as e:
         print(f"❌ خطأ في تشغيل البوت: {e}")
-        logging.error(f"Bot failed to start: {e}")
 
 if __name__ == '__main__':
     main()
