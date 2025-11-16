@@ -14,7 +14,7 @@ logging.basicConfig(
 )
 
 # 🔑 ضع التوكن الجديد هنا
-BOT_TOKEN = "ضع_التوكن_الجديد_هنا"
+BOT_TOKEN = "7087784225:AAF-TUMXou11lHOr5VLRq37PgCEbOBqKH3U"
 
 class UsernameChecker:
     def __init__(self):
