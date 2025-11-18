@@ -1,6 +1,6 @@
 import telebot, requests, random, string
 
-TOKEN = "7087784225:AAF-TUMXou11lHOr5VLRq37PgCEbOBqKH3U"
+TOKEN = "8462132430:AAGXN9A94ixI2Ak4x4lB-xCsL1VbNGDtTJc"
 bot = telebot.TeleBot(TOKEN)
 
 # توليد يوزر خماسي عشوائي
